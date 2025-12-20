@@ -10,6 +10,7 @@ use crate::{
 };
 
 mod serialize;
+mod zeek_websocket_v1;
 
 #[cxx::bridge]
 mod ffi {
