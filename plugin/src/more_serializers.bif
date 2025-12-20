@@ -1,0 +1,75 @@
+module Zeek::more_serializers;
+
+%%{
+
+#include <optional>
+
+#include "zeek_more_serializers_cxx/lib.h"
+
+std::optional<Format> to_format(auto&& format) {
+    auto* fmt_ = format->AsEnumVal();
+    if (!fmt_)
+        return {};
+    auto&& fmt = fmt_->SizeVal();
+    if (!fmt)
+        return {};
+
+    return {Format{static_cast<std::underlying_type_t<Format>>(fmt->AsCount())}};
+}
+
+%%}
+
+enum Format %{
+    FormatBinary = 0,
+    FormatHuman = 1,
+%}
+
+function serialize_val%(val: any, format: Format%): string
+%{
+    if (!val)
+        return nullptr;
+
+    auto fmt = to_format(format);
+    if (!fmt)
+        return nullptr;
+
+    zeek::byte_buffer buf;
+    try {
+        serialize_val(*val, *fmt, buf);
+    } catch (const std::exception& e) {
+        reporter->Error("%s", e.what());
+        return nullptr;
+    }
+    return zeek::make_intrusive<zeek::StringVal>(buf.size(), reinterpret_cast<const char*>(buf.data()));
+%}
+
+function deserialize_val%(val: string, ty: any, format: Format%): any
+%{
+    if (!val || !ty)
+        return nullptr;
+
+    auto* type_val = ty->AsTypeVal();
+    if (!ty)
+        return nullptr;
+
+    const auto& type = type_val->GetType();
+    if (!type)
+        return nullptr;
+
+    auto* typetype = type->AsTypeType();
+    if (!typetype)
+        return nullptr;
+
+    auto fmt = to_format(format);
+    if (!fmt)
+        return nullptr;
+
+    auto data = rust::Slice<const uint8_t>(reinterpret_cast<const uint8_t*>(val->Bytes()), val->Len());
+    try {
+        auto de = deserialize_val(data, *fmt, typetype->GetType());
+        return {zeek::AdoptRef{}, de.release()->release()};
+    } catch (const std::exception& e) {
+        reporter->Error("%s", e.what());
+        return nullptr;
+    }
+%}

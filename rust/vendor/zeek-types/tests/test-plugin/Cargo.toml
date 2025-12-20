@@ -1,0 +1,20 @@
+[package]
+name = "test-plugin"
+description = "Zeek plugin which when loaded runs fixed tests"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ctor = "0.6.3"
+cxx = { version = "1.0.192", features = ["c++20"] }
+proptest = { version = "1.9.0" }
+zeek-types = { path = "../..", features = ["proptest"] }
+
+[build-dependencies]
+cargo-emit = "0.2.1"
+scratch = "1.0.9"
+
+[lib]
+crate-type = ["dylib"]
+test = false
+doctest = false
