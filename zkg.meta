@@ -1,0 +1,15 @@
+[package]
+script_dir = scripts
+build_command = ./configure && cmake --build build
+test_command = cd testing && btest -c btest.cfg
+summary = More serializers for Zeek
+
+[template]
+source = https://github.com/zeek/package-template
+version = v3.1.7
+zkg_version = 3.1.0-13
+features = plugin
+
+[template_vars]
+name = more_serializers
+namespace = Zeek

@@ -1,0 +1,67 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: -D warnings
+  # For setup-rust
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    name: Run pre-commit hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670
+        with:
+          channel: stable
+          bins: cargo-hack
+          components: clippy,rustfmt
+      - uses: actions/setup-python@v6
+      - uses: j178/prek-action@91fd7d7cf70ae1dee9f4f44e7dfa5d1073fe6623
+
+  plugin:
+    name: Run plugin tests
+    runs-on: ubuntu-latest
+    container:
+      # TODO(bbannier): We need just zeek-8.1, but not even RC images are available
+      image: zeek/zeek-dev
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt install -y cmake g++ curl wget libssl-dev libpcap-dev ninja-build
+      - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670
+        with:
+          channel: stable
+      - name: Build
+        run: |
+          CMAKE_GENERATOR=Ninja ./configure
+          ninja -C build
+      - name: Test
+        run: |
+          make -C testing
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: btest-tmp
+          path: testing/.tmp
+          include-hidden-files: true
+          retention-days: 5

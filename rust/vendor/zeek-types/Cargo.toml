@@ -1,0 +1,31 @@
+[package]
+name = "zeek-types"
+version = "0.1.0"
+edition = "2024"
+# links = "zeek_types_cxx"
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+cxx = { version = "1.0.192", features = ["c++20"] }
+num-traits = "0.2.19"
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+thiserror = "2.0.17"
+time = { version = "0.3.44", features = ["serde"] }
+
+[features]
+default = ["serde"]
+serde = ["dep:serde"]
+corrosion = []
+
+[build-dependencies]
+cargo-emit = "0.2.1"
+cxx-build = "1.0.192"
+
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+ignored_unit_patterns = "deny"
+clone_on_ref_ptr = "deny"
+redundant_clone = "deny"
