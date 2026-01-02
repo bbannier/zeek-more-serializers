@@ -12,6 +12,7 @@ cxx = { version = "1.0.192", features = ["c++20"] }
 derivative = "2.2.0"
 ipnetwork = { version = "0.21.1", default-features = false, features = ["serde"] }
 num-traits = "0.2.19"
+proptest = { version = "1.9.0", optional = true }
 serde = { version = "1.0.228", features = ["derive"], optional = true }
 thiserror = "2.0.17"
 time = { version = "0.3.44", features = ["serde"] }
@@ -20,6 +21,7 @@ time = { version = "0.3.44", features = ["serde"] }
 default = ["serde"]
 serde = ["dep:serde"]
 corrosion = []
+proptest = ["dep:proptest"]
 
 [build-dependencies]
 cargo-emit = "0.2.1"

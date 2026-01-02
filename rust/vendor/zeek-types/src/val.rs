@@ -3,6 +3,10 @@ use core::slice;
 use derivative::Derivative;
 use ipnetwork::IpNetwork;
 use num_traits::cast::FromPrimitive;
+
+#[cfg(feature = "proptest")]
+use proptest::prelude::{Arbitrary, BoxedStrategy};
+
 use std::{borrow::Cow, collections::BTreeMap, net::IpAddr};
 
 use time::{Duration, OffsetDateTime};
@@ -608,5 +612,83 @@ impl TypeId<'_> {
     #[must_use]
     pub fn into_owned(self) -> TypeId<'static> {
         todo!()
+    }
+}
+
+#[cfg(feature = "proptest")]
+impl Arbitrary for Val<'static> {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        use std::net::{Ipv4Addr, Ipv6Addr};
+
+        use ipnetwork::{Ipv4Network, Ipv6Network};
+        use proptest::prelude::*;
+
+        prop_oneof![
+            Just(Val::None),
+            any::<bool>().prop_map(Val::Bool),
+            any::<u64>().prop_map(Val::Count),
+            any::<i64>().prop_map(Val::Int),
+            any::<f64>().prop_map(Val::Double),
+            ("Notice::Type", 0..32u64).prop_map(|(id, n)| Val::Enum(TypeId::new(id), n)),
+            any::<Vec<u8>>().prop_map(|x| Val::String(x.into())),
+            (any::<u16>(), any::<TransportProto>()).prop_map(|(num, proto)| Val::Port {
+                num: num.into(), // FIXME(bbannier): constrain this on the type level.
+                proto
+            }),
+            any::<IpAddr>().prop_map(Val::Addr),
+            (any::<Ipv4Addr>(), 0..=32u8)
+                .prop_filter_map("invalid ipv4 address", |(addr, prefix)| {
+                    Some(Val::Subnet(IpNetwork::V4(
+                        Ipv4Network::new(addr, prefix).ok()?,
+                    )))
+                })
+                .boxed(),
+            (any::<Ipv6Addr>(), 0..=32u8).prop_filter_map(
+                "invalid ipv6 address",
+                |(addr, prefix)| Some(Val::Subnet(IpNetwork::V6(
+                    Ipv6Network::new(addr, prefix).ok()?
+                )))
+            ),
+            (-1_000_000..=1_000_000i64, any::<i32>()).prop_map(|(s, ns)| {
+                // Limit seconds range since Zeek interval loose precision near the edges of range.
+                Val::Interval(Duration::new(s, ns))
+            }),
+            (-1_000..1_000_000_000i64).prop_filter_map("invalid timestamp", |x| {
+                // Limit time range since Zeek time looses precision near edges of range.
+                Some(Val::Time(OffsetDateTime::from_unix_timestamp(x).ok()?))
+            }),
+            // FIXME(bbannier): implement these as well.
+            // prop::collection::vec(any::<Val>(), 0..1024).prop_map(|x| Val::Vec(x)),
+            // prop::collection::vec(val_strategy(), 0..1024).prop_map(|x| Val::List(x)),
+            // Just(Val::Set(todo!())),
+            // Just(Val::Table(todo!())),
+            // Just(Val::Pattern {
+            //     exact: todo!(),
+            //     anywhere: todo!()
+            // }),
+            // Just(Val::Record(todo!(), todo!())),
+        ]
+        .boxed()
+    }
+}
+
+#[cfg(feature = "proptest")]
+impl Arbitrary for TransportProto {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+        use proptest::prelude::*;
+
+        prop_oneof![
+            Just(TransportProto::Unknown),
+            Just(TransportProto::Tcp),
+            Just(TransportProto::Udp),
+            Just(TransportProto::Icmp),
+        ]
+        .boxed()
     }
 }

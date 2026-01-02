@@ -4,7 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace]
-members = ["vendor/zeek-types"]
+members = [
+    "vendor/zeek-types",
+    "vendor/zeek-types/zeek-types-tests",
+    "vendor/zeek-types/zeek-types-tests/test-run",
+    "vendor/zeek-types/zeek-types-tests/test-run/xtask",
+]
 
 [lib]
 crate-type = ["staticlib"]
