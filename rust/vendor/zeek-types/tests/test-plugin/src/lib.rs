@@ -11,7 +11,7 @@ use zeek_types::{Error, Val, support::PluginWrapper, zeek};
 // Zeek expects plugins to be constructed on library load time. This function accomplishes that.
 #[ctor]
 fn init() {
-    static _PLUGIN: LazyLock<TestPlugin> = LazyLock::new(|| TestPlugin::new());
+    static _PLUGIN: LazyLock<TestPlugin> = LazyLock::new(TestPlugin::new);
     let _ = &*_PLUGIN;
 }
 
