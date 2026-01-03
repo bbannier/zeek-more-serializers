@@ -13,9 +13,8 @@ mod tests {
         let proptest_cases = env::var("PROPTEST_CASES").unwrap_or_else(|_| "50000".to_string());
         let proptest_verbose = env::var("PROPTEST_VERBOSE").unwrap_or_else(|_| "0".to_string());
 
-        dbg!(&dist_dir);
         let status = Command::new("zeek")
-            // This loads the plugin from the parent crate.
+            // Load the test plugin.
             .env("ZEEK_PLUGIN_PATH", &dist_dir)
             // Pass an empty input file so we exit immediately.
             .arg("/dev/null")
