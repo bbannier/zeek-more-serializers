@@ -7,7 +7,7 @@ edition = "2024"
 ctor = "0.6.3"
 cxx = { version = "1.0.192", features = ["c++20"] }
 proptest = { version = "1.9.0" }
-zeek-types = { path = "..", features = ["proptest"] }
+zeek-types = { path = "../..", features = ["proptest"] }
 
 [build-dependencies]
 cargo-emit = "0.2.1"
