@@ -1,5 +1,6 @@
 #[cfg_attr(not(target_os = "macos"), allow(unused_imports))]
 use cargo_emit::rerun_if_changed;
+use cargo_emit::rerun_if_env_changed;
 use std::process::Command;
 
 fn main() -> Result<(), String> {
@@ -13,9 +14,11 @@ fn main() -> Result<(), String> {
     if !cfg!(feature = "corrosion") {
         bridge
             .file("src/interop.cc")
+            .file("src/plugin.cc")
             .include("src/")
             .includes(&zeek_include_dirs()?)
             .flag_if_supported("-Wno-unused-parameter")
+            .flag_if_supported("-Wno-unused-variable")
             .std("c++20")
             .compile("zeek-types");
 
@@ -23,12 +26,15 @@ fn main() -> Result<(), String> {
         rerun_if_changed!("src/lib.rs");
         rerun_if_changed!("src/interop.h");
         rerun_if_changed!("src/interop.cc");
+        rerun_if_changed!("src/plugin.h");
+        rerun_if_changed!("src/plugin.cc");
     }
 
     Ok(())
 }
 
 fn zeek_include_dirs() -> Result<Vec<String>, String> {
+    rerun_if_env_changed!("PATH");
     let output = Command::new("zeek-config")
         .arg("--include_dir")
         .output()

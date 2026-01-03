@@ -1,5 +1,7 @@
 use crate::{UniquePtr, ffi::zeek_id_find_type, wrap_unsafe};
 use core::slice;
+use derivative::Derivative;
+use ipnetwork::IpNetwork;
 use num_traits::cast::FromPrimitive;
 use std::{borrow::Cow, collections::BTreeMap, net::IpAddr};
 
@@ -75,10 +77,8 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
         TypeTag::TYPE_SUBNET => {
             let sub = val.as_subnet_val().ok_or(Error::ValueUnset)?;
             let sub = ffi::Subnet::from(sub);
-            Self::Subnet {
-                prefix: sub.prefix.try_into()?,
-                width: sub.width,
-            }
+            let network = IpNetwork::new(sub.prefix.try_into()?, sub.width.try_into()?)?;
+            Self::Subnet(network)
         }
         TypeTag::TYPE_INTERVAL => {
             let secs = val.as_interval();
@@ -202,7 +202,9 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
 /// Rust wrapper around `zeek::Val`.
 #[allow(clippy::unsafe_derive_deserialize)] // Fires incorrectly, FP.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Val<'a> {
     None,
     Bool(bool),
@@ -215,11 +217,11 @@ pub enum Val<'a> {
         num: u32,
         proto: TransportProto,
     },
-    Addr(IpAddr),
-    Subnet {
-        prefix: IpAddr,
-        width: isize,
-    },
+    // Use custom comparison function for special handling of mapped IPv6 addresses.
+    Addr(#[derivative(PartialEq(compare_with = "compare_ipaddr"))] IpAddr),
+    // Use custom comparison function since `IpNetwork` by default compares for bit equality, but
+    // we want equivalence.
+    Subnet(#[derivative(PartialEq(compare_with = "compare_ipnetwork"))] IpNetwork),
     Interval(Duration),
     Time(OffsetDateTime),
     Vec(Vec<Val<'a>>),
@@ -291,7 +293,7 @@ impl<'a> Val<'a> {
                 ffi::make_vector(vals)
             }
             Val::Addr(x) => ffi::make_addr(&x.to_string()),
-            Val::Subnet { prefix, width } => ffi::make_subnet(&prefix.to_string(), *width),
+            Val::Subnet(x) => ffi::make_subnet(&x.network().to_string(), x.prefix()),
             Val::Enum(name, x) => {
                 let ty = zeek_id_find_type(&name.0)
                     .val()
@@ -481,7 +483,7 @@ impl<'a> Val<'a> {
             Val::Double(x) => Val::Double(x),
             Val::Port { num, proto } => Val::Port { num, proto },
             Val::Addr(x) => Val::Addr(x),
-            Val::Subnet { prefix, width } => Val::Subnet { prefix, width },
+            Val::Subnet(x) => Val::Subnet(x),
             Val::Interval(x) => Val::Interval(x),
             Val::Time(x) => Val::Time(x),
         }
@@ -506,6 +508,21 @@ impl<'a> TryFrom<&'a ffi::ListVal> for Vec<Val<'a>> {
             .map(|i| value.Idx(i).val().ok_or(Error::ValueUnset)?.try_into())
             .collect()
     }
+}
+
+fn compare_ipnetwork(a: &IpNetwork, b: &IpNetwork) -> bool {
+    compare_ipaddr(&a.network(), &b.network()) && a.prefix() == b.prefix()
+}
+
+fn compare_ipaddr(a: &IpAddr, b: &IpAddr) -> bool {
+    fn make_canonical(addr: IpAddr) -> IpAddr {
+        match addr {
+            IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),
+            v4 @ IpAddr::V4(..) => v4,
+        }
+    }
+
+    make_canonical(*a) == make_canonical(*b)
 }
 
 impl ValInterface for ffi::Val {
@@ -569,7 +586,7 @@ impl ValInterface for ffi::Val {
 // NOTE: Ideally we'd have some cheap-to-copy ID like a `u64` directly from Zeek to refer to custom
 // types, but this doesn't seem to exist. The value here is static, but depending on the identifier
 // length might require considerable space.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TypeId<'a>(Cow<'a, str>);
 

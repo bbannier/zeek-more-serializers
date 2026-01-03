@@ -116,7 +116,7 @@ std::unique_ptr<zeek::ValPtr> make_time(double x);
 std::unique_ptr<zeek::ValPtr> make_vector(std::unique_ptr<ValPtrVector> xs);
 std::unique_ptr<zeek::ValPtr> make_list(std::unique_ptr<ValPtrVector> xs);
 std::unique_ptr<zeek::ValPtr> make_addr(rust::Str x);
-std::unique_ptr<zeek::ValPtr> make_subnet(rust::Str prefix, long width);
+std::unique_ptr<zeek::ValPtr> make_subnet(rust::Str x, uint8_t prefix);
 std::unique_ptr<zeek::ValPtr> make_enum(uint64_t x, const zeek::EnumType &ty);
 std::unique_ptr<zeek::ValPtr> make_port(uint32_t num, TransportProto proto);
 std::unique_ptr<zeek::ValPtr> make_record(rust::Slice<const rust::Str> names,

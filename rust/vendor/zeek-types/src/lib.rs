@@ -30,6 +30,7 @@ pub mod zeek {
         AddrVal, Args, EnumType, EnumVal, EnumValPtr, EventMetadataDescriptor, ListVal, PatternVal,
         PortVal, RE_Matcher, RecordType, RecordVal, StringVal, SubNetVal, TableType, TableVal,
         Type, TypeList, TypeListPtr, TypePtr, TypeTag, Val, ValPtr, VectorType, VectorVal,
+        base_type,
     };
 
     pub mod cluster {
@@ -49,8 +50,9 @@ pub mod zeek {
 pub mod support {
     pub use crate::ByteBufferWriter;
     pub use crate::ffi::{
-        ByteBuffer, TableEntry, TableIterator, ValPtrVector, event_add_metadata, event_make,
-        event_name, event_registry_lookup_event_arg_type, event_registry_lookup_metadata,
+        ByteBuffer, PluginWrapper, TableEntry, TableIterator, ValPtrVector, event_add_metadata,
+        event_make, event_name, event_registry_lookup_event_arg_type,
+        event_registry_lookup_metadata,
     };
 }
 
@@ -237,6 +239,9 @@ mod ffi {
         fn AsRecord(self: &ZVal) -> *mut RecordVal;
         fn AsList(self: &ZVal) -> *mut ListVal;
         fn AsAny(self: &ZVal) -> *mut Val;
+
+        #[must_use]
+        fn base_type(tag: TypeTag) -> &'static TypePtr;
     }
 
     #[namespace = "::zeek::cluster"]
@@ -252,6 +257,26 @@ mod ffi {
         type MetadataEntry;
         fn Id(self: &MetadataEntry) -> u64;
         fn Val(self: &MetadataEntry) -> &ValPtr;
+    }
+
+    #[namespace = "::zeek::plugin"]
+    unsafe extern "C++" {
+        include!("zeek/plugin/Plugin.h");
+        type Plugin;
+
+        type Configuration;
+    }
+
+    #[namespace = "::support"]
+    unsafe extern "C++" {
+        include!("plugin.h");
+
+        type PluginWrapper;
+        #[Self = "PluginWrapper"]
+        #[rust_name = "new"]
+        #[must_use]
+        fn make(name: &str, description: &str) -> UniquePtr<PluginWrapper>;
+        fn with_init_pre_execution(self: Pin<&mut PluginWrapper>, hook: fn());
     }
 
     unsafe extern "C++" {
@@ -337,7 +362,7 @@ mod ffi {
         fn make_addr(x: &str) -> UniquePtr<ValPtr>;
 
         #[must_use]
-        fn make_subnet(addr: &str, width: isize) -> UniquePtr<ValPtr>;
+        fn make_subnet(addr: &str, prefix: u8) -> UniquePtr<ValPtr>;
 
         #[must_use]
         fn make_enum(x: u64, ty: &EnumType) -> UniquePtr<ValPtr>;
@@ -379,7 +404,7 @@ mod ffi {
 
 /// Safe Rust type mapping Zeek's `zeek::TransportProto`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TransportProto {
     Unknown,
     Tcp,
@@ -561,11 +586,11 @@ macro_rules! wrap_unsafe_pub {
 }
 
 impl ffi::ValPtr {
-    wrap_unsafe!(val, get, ffi::Val);
+    wrap_unsafe_pub!(val, get, ffi::Val);
 }
 
 impl ffi::TypeListPtr {
-    wrap_unsafe!(val, get, ffi::TypeList);
+    wrap_unsafe_pub!(val, get, ffi::TypeList);
 }
 
 impl ffi::TypePtr {
@@ -642,3 +667,6 @@ fn event_registry_lookup_event_arg_type(name: &str, idx: usize) -> Option<&ffi::
 fn event_registry_lookup_metadata(id: u64) -> Option<&'static ffi::EventMetadataDescriptor> {
     unsafe { ffi::event_registry_lookup_metadata(id).as_ref() }
 }
+
+unsafe impl Send for ffi::PluginWrapper {}
+unsafe impl Sync for ffi::PluginWrapper {}

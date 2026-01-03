@@ -175,9 +175,11 @@ std::unique_ptr<zeek::ValPtr> make_addr(rust::Str addr_) {
   return wrap(zeek::make_intrusive<zeek::AddrVal>(addr));
 }
 
-std::unique_ptr<zeek::ValPtr> make_subnet(rust::Str prefix_, long width) {
-  std::string prefix{prefix_.begin(), prefix_.end()};
-  return wrap(zeek::make_intrusive<zeek::SubNetVal>(prefix, width));
+std::unique_ptr<zeek::ValPtr> make_subnet(rust::Str addr_, uint8_t prefix) {
+  std::string s{addr_.begin(), addr_.end()};
+
+  return wrap(zeek::make_intrusive<zeek::SubNetVal>(
+      zeek::IPPrefix{zeek::IPAddr{s.c_str()}, prefix}));
 }
 
 std::unique_ptr<zeek::ValPtr> make_enum(uint64_t x, const zeek::EnumType &ty_) {

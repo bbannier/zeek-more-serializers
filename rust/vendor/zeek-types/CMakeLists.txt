@@ -19,7 +19,7 @@ corrosion_add_cxxbridge(
     FILES lib.rs
 )
 
-target_sources(zeek_types_cxx PRIVATE src/interop.cc)
+target_sources(zeek_types_cxx PRIVATE src/interop.cc src/plugin.cc)
 
 target_include_directories(zeek_types_cxx PRIVATE
     ${ZEEK_INCLUDE_DIR}

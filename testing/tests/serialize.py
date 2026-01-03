@@ -72,6 +72,9 @@ def gen(format: str) -> None:
             # Subnet.
             ("subnet", "1.2.3.4/32"),
             ("subnet", "[::]/64"),
+            ("subnet", "0.0.0.0/1"),
+            ("subnet", "128.0.0.0/1"),
+            ("subnet", "[::ffff:0.0.0.0]/1"),
             # Interval.
             ("interval", "1sec"),
             ("interval", "1min"),

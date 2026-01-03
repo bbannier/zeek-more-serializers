@@ -20,8 +20,11 @@ port, 1/icmp, {"Port":{"num":1,"proto":"Icmp"}}, 1/icmp
 port, 2/unknown, {"Port":{"num":2,"proto":"Unknown"}}, 2/unknown
 addr, 1.2.3.4, {"Addr":"1.2.3.4"}, 1.2.3.4
 addr, ::1, {"Addr":"::1"}, ::1
-subnet, 1.2.3.4/32, {"Subnet":{"prefix":"1.2.3.4","width":32}}, 1.2.3.4/32
-subnet, ::/64, {"Subnet":{"prefix":"::","width":64}}, ::/64
+subnet, 1.2.3.4/32, {"Subnet":"1.2.3.4/32"}, 1.2.3.4/32
+subnet, ::/64, {"Subnet":"::/64"}, ::/64
+subnet, 0.0.0.0/1, {"Subnet":"0.0.0.0/1"}, 0.0.0.0/1
+subnet, 128.0.0.0/1, {"Subnet":"128.0.0.0/1"}, 128.0.0.0/1
+subnet, ::/1, {"Subnet":"::/1"}, ::/1
 interval, 1.0 sec, {"Interval":[1,0]}, 1.0 sec
 interval, 1.0 min, {"Interval":[60,0]}, 1.0 min
 interval, -1.0 day, {"Interval":[-86400,0]}, -1.0 day

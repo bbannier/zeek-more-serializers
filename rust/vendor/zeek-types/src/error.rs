@@ -1,5 +1,6 @@
 use std::{num::TryFromIntError, str::Utf8Error};
 
+use ipnetwork::IpNetworkError;
 use thiserror::Error;
 
 use crate::ffi;
@@ -67,6 +68,9 @@ pub enum Error {
 
     #[error("metadata ID {0} is unknown")]
     UnknownMetadataId(u64),
+
+    #[error("IP network error: {0}")]
+    IpNetworkError(#[from] IpNetworkError),
 
     #[error("{0}")]
     CxxException(#[from] cxx::Exception),
