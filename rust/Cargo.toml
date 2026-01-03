@@ -6,9 +6,9 @@ edition = "2024"
 [workspace]
 members = [
     "vendor/zeek-types",
-    "vendor/zeek-types/tests/zeek-types-tests",
-    "vendor/zeek-types/tests/zeek-types-tests/test-run",
-    "vendor/zeek-types/tests/zeek-types-tests/test-run/xtask",
+    "vendor/zeek-types/tests/test-plugin",
+    "vendor/zeek-types/tests/test-plugin/test-run",
+    "vendor/zeek-types/tests/test-plugin/test-run/xtask",
 ]
 
 [lib]
