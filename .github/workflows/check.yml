@@ -41,7 +41,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          submodules: recursive
           persist-credentials: false
       - name: Install dependencies
         run: |
@@ -65,3 +64,20 @@ jobs:
           path: testing/.tmp
           include-hidden-files: true
           retention-days: 5
+  rust:
+    name: Run Rust tests
+    runs-on: ubuntu-latest
+    container:
+      # TODO(bbannier): We need just zeek-8.1, but not even RC images are available
+      image: zeek/zeek-dev
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670
+        with:
+          channel: stable
+      - name: Test
+        run: |
+          cargo t --workspace --manifest-path rust/Cargo.toml
