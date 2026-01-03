@@ -25,4 +25,17 @@ mod tests {
             .unwrap();
         assert!(status.success());
     }
+
+    fn xtask(args: &[&str]) -> String {
+        let output = Command::new("cargo")
+            .arg("xtask")
+            .args(args)
+            .stdout(Stdio::piped())
+            .output()
+            .unwrap();
+
+        assert!(output.status.success());
+
+        String::from_utf8(output.stdout).unwrap()
+    }
 }
