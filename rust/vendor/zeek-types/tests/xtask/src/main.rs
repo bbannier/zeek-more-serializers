@@ -73,13 +73,20 @@ fn dist(package: String) -> Result<()> {
     let os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let os = match os.as_str() {
         "macos" => "darwin",
+        "linux" => "linux",
         _ => {
             panic!("unsupported target OS '{os}'");
         }
     };
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let arch = match arch.as_str() {
-        "aarch64" => "arm64",
+        "aarch64" => {
+            if os == "macos" {
+                "arm64"
+            } else {
+                arch.as_str()
+            }
+        }
         _ => {
             panic!("unsupported target architecture '{arch}'");
         }

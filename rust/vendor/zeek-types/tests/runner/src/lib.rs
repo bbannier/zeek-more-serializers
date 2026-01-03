@@ -30,9 +30,11 @@ mod tests {
             .arg("xtask")
             .args(args)
             .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             .output()
             .unwrap();
 
+        eprintln!("{}", String::from_utf8(output.stderr).unwrap());
         assert!(output.status.success());
 
         String::from_utf8(output.stdout).unwrap()
