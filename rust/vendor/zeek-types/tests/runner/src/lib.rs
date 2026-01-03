@@ -4,8 +4,6 @@ mod tests {
 
     #[test]
     fn plugin_tests() {
-        build();
-
         let dist = scratch::path("dist");
 
         let proptest_cases = env::var("PROPTEST_CASES").unwrap_or_else(|_| "50000".to_string());
@@ -19,14 +17,6 @@ mod tests {
             .arg("/dev/null")
             .env("PROPTEST_CASES", proptest_cases)
             .env("PROPTEST_VERBOSE", proptest_verbose)
-            .status()
-            .unwrap();
-        assert!(status.success());
-    }
-
-    fn build() {
-        let status = Command::new("cargo")
-            .args(["xtask", "build"])
             .status()
             .unwrap();
         assert!(status.success());
