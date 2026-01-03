@@ -7,13 +7,8 @@ mod tests {
 
     #[test]
     fn plugin_tests() {
-        let output = Command::new("cargo")
-            .args(["xtask", "dist-dir"])
-            .stdout(Stdio::piped())
-            .output()
-            .unwrap();
-        let dist_dir = String::from_utf8(output.stdout).unwrap();
-        let dist_dir = dist_dir.trim();
+        xtask(&["dist", "test-plugin"]);
+        let dist_dir = xtask(&["dist-dir"]).trim().to_owned();
 
         let proptest_cases = env::var("PROPTEST_CASES").unwrap_or_else(|_| "50000".to_string());
         let proptest_verbose = env::var("PROPTEST_VERBOSE").unwrap_or_else(|_| "0".to_string());
