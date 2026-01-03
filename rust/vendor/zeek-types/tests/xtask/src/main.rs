@@ -87,6 +87,7 @@ fn dist(package: String) -> Result<()> {
                 arch.as_str()
             }
         }
+        "x86_64" => arch.as_str(),
         _ => {
             panic!("unsupported target architecture '{arch}'");
         }
