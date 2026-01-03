@@ -1,5 +1,6 @@
 [package]
 name = "test-plugin"
+description = "Zeek plugin which when loaded runs fixed tests"
 version = "0.1.0"
 edition = "2024"
 
