@@ -5,6 +5,3 @@ edition = "2024"
 
 [dependencies]
 test-plugin = { path = "../test-plugin" }
-
-[dev-dependencies]
-scratch = "1.0.9"

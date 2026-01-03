@@ -1,20 +1,25 @@
-use std::{env, process::Command};
+use clap::{Parser, Subcommand};
+
+#[derive(Parser)]
+struct Args {
+    #[command(subcommand)]
+    command: Command,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    DistDir,
+}
 
 fn main() {
-    let task = env::args().nth(1);
-    match task.as_deref() {
-        Some("build") => build(),
-        Some(task) => unimplemented!("unknown task {task}"),
-        None => unimplemented!("expected task as first argument"),
+    let args = Args::parse();
+    match args.command {
+        Command::DistDir => dist(),
     }
 }
 
-fn build() {
-    let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".to_string());
-
-    let status = Command::new(cargo)
-        .args(["build", "--workspace"])
-        .status()
-        .unwrap();
-    assert!(status.success());
+fn dist() {
+    let dist = scratch::path("dist");
+    let dist = dist.to_str().unwrap();
+    println!("{dist}");
 }
