@@ -81,7 +81,7 @@ fn dist(package: String) -> Result<()> {
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let arch = match arch.as_str() {
         "aarch64" => {
-            if os == "macos" {
+            if os == "darwin" {
                 "arm64"
             } else {
                 arch.as_str()
