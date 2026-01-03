@@ -33,7 +33,7 @@ fn dist_dir() -> Result<()> {
     let dist = scratch::path("dist");
     let dist = dist
         .to_str()
-        .expect(&format!("path '{dist:?}' is not valid UTF-8"));
+        .unwrap_or_else(|| panic!("path '{dist:?}' is not valid UTF-8"));
     println!("{dist}");
 
     Ok(())
@@ -42,7 +42,7 @@ fn dist_dir() -> Result<()> {
 fn dist(package: String) -> Result<()> {
     // Build the package.
     std::process::Command::new("cargo")
-        .args(&["build", "--package", &package])
+        .args(["build", "--package", &package])
         .status()?;
 
     let out_dir: PathBuf = env!("OUT_DIR").into();
