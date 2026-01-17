@@ -21,6 +21,6 @@ include(ZeekPlugin)
 zeek_add_plugin(Zeek more_serializers
   SOURCES plugin/src/Plugin.cc
   BIFS plugin/src/more_serializers.bif
-  DIST_FILES README COPYING
+  DIST_FILES README.md COPYING
   DEPENDENCIES zeek_more_serializers_cxx
   INCLUDE_DIRS plugin/src)
