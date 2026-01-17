@@ -2,6 +2,14 @@
 # Put required additional cmake functionality into plugin.cmake.
 cmake_minimum_required(VERSION 3.15.0 FATAL_ERROR)
 
+execute_process(
+  COMMAND zeek-config --cmake_dir
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  OUTPUT_VARIABLE zeek_cmake_dir
+  COMMAND_ERROR_IS_FATAL ANY)
+
+list(PREPEND CMAKE_MODULE_PATH "${zeek_cmake_dir}")
+
 project(ZeekPluginmore_serializers VERSION 0.1.0 LANGUAGES CXX)
 
 configure_file("plugin/src/config.h.in" "config.h" @ONLY)

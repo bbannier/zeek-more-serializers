@@ -1,3 +1,5 @@
+find_package(Zeek REQUIRED)
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -22,7 +24,7 @@ corrosion_add_cxxbridge(
 target_sources(zeek_types_cxx PRIVATE src/interop.cc src/plugin.cc)
 
 target_include_directories(zeek_types_cxx PRIVATE
-    ${ZEEK_INCLUDE_DIR}
+    ${ZEEK_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 target_include_directories(zeek_types_cxx PUBLIC

@@ -1,4 +1,4 @@
-string(REPLACE ":" ";" ZEEK_INCLUDE_DIR "${BRO_CONFIG_INCLUDE_DIR}")
+find_package(Zeek REQUIRED)
 
 include(FetchContent)
 
@@ -27,7 +27,7 @@ corrosion_add_cxxbridge(
 )
 
 target_include_directories(zeek_more_serializers_cxx PUBLIC
-    ${ZEEK_INCLUDE_DIR}
+    ${ZEEK_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 set_target_properties(zeek_more_serializers_cxx PROPERTIES
