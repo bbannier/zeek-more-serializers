@@ -18,13 +18,9 @@ add_subdirectory(rust)
 
 include(ZeekPlugin)
 
-zeek_plugin_begin(Zeek more_serializers)
-
-zeek_plugin_cc("plugin/src/Plugin.cc")
-zeek_plugin_bif("plugin/src/more_serializers.bif")
-zeek_plugin_dist_files(README COPYING)
-zeek_plugin_link_library(zeek_more_serializers_cxx)
-
-zeek_plugin_end()
-
-target_include_directories(Zeek_more_serializers PUBLIC "plugin/src")
+zeek_add_plugin(Zeek more_serializers
+  SOURCES plugin/src/Plugin.cc
+  BIFS plugin/src/more_serializers.bif
+  DIST_FILES README COPYING
+  DEPENDENCIES zeek_more_serializers_cxx
+  INCLUDE_DIRS plugin/src)
