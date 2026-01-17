@@ -4,8 +4,7 @@ cmake_minimum_required(VERSION 3.15.0 FATAL_ERROR)
 
 project(ZeekPluginmore_serializers VERSION 0.1.0 LANGUAGES CXX)
 
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/plugin/src/config.h.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/config.h" @ONLY)
+configure_file("plugin/src/config.h.in" "config.h" @ONLY)
 
 add_subdirectory(rust)
 
