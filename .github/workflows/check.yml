@@ -41,6 +41,7 @@ jobs:
       matrix:
         zeek-version:
           - "zeek/zeek:8.0"
+          - "zeek/zeek:8.1"
           - "zeek/zeek-dev"
     container:
       image: ${{ matrix.zeek-version }}
@@ -80,6 +81,7 @@ jobs:
       matrix:
         zeek-version:
           - "zeek/zeek:8.0"
+          - "zeek/zeek:8.1"
           - "zeek/zeek-dev"
     container:
       image: ${{ matrix.zeek-version }}
