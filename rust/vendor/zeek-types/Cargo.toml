@@ -2,7 +2,6 @@
 name = "zeek-types"
 version = "0.1.0"
 edition = "2024"
-# links = "zeek_types_cxx"
 
 [lib]
 crate-type = ["rlib", "staticlib"]
