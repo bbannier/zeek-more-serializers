@@ -1,4 +1,4 @@
-use std::sync::LazyLock;
+use std::{str::FromStr, sync::LazyLock};
 
 use ctor::ctor;
 use cxx::UniquePtr;
@@ -6,7 +6,12 @@ use proptest::{
     prelude::*,
     test_runner::{Config, TestRunner},
 };
-use zeek_types::{Error, Val, support::PluginWrapper};
+use zeek_types::{
+    Error, IpNetwork, Val, arbitrary_val,
+    support::PluginWrapper,
+    types::{SetType, Type},
+    zeek::TypeTag,
+};
 
 // Zeek expects plugins to be constructed on library load time. This function accomplishes that.
 #[ctor]
@@ -21,7 +26,8 @@ struct TestPlugin(#[allow(unused)] UniquePtr<PluginWrapper>);
 
 impl TestPlugin {
     fn run_tests() {
-        test_list();
+        vector();
+        subnet();
         check_round_trip().unwrap();
     }
 
@@ -40,16 +46,17 @@ fn check_round_trip() -> Result<()> {
         ..Config::default()
     });
 
-    let strategy = any::<Val<'static>>();
+    let strategy = any::<Type>()
+        .prop_flat_map(|ty| arbitrary_val(ty.clone()).prop_map(move |val| (ty.clone(), val)));
 
     runner
-        .run(&strategy, |x0| {
-            // We cannot create Zeek values from naked `None` values.
-            if matches!(&x0, Val::None) {
-                return Ok(());
-            }
+        .run(&strategy, |(ty, x0)| {
+            let ty: cxx::UniquePtr<_> = ty.try_into().expect("type should be compatible with Zeek");
 
-            let x = x0.to_valptr(None)?;
+            // We cannot create Zeek values from naked `None` values.
+            assert!(!matches!(&x0, Val::None));
+
+            let x = x0.clone().to_valptr(Some(&*ty))?;
             let x = x.val().ok_or(Error::ValueUnset)?;
             let x1: Val = x.try_into()?;
 
@@ -63,16 +70,24 @@ fn check_round_trip() -> Result<()> {
     Ok(())
 }
 
-fn test_list() {
-    // Lists containing `None` are unsupported by Zeek.
-    assert_eq!(
-        Val::List(vec![Val::None]).to_valptr(None).err(),
-        Some(Error::ValueUnset)
-    );
-    assert_eq!(
-        Val::List(vec![Val::Bool(true), Val::None])
-            .to_valptr(None)
-            .err(),
-        Some(Error::ValueUnset)
-    );
+fn vector() {
+    let ty: cxx::UniquePtr<_> = Type::Vec(Some(Box::new(Type::Count))).try_into().unwrap();
+    assert_eq!(ty.val().unwrap().Tag(), TypeTag::TYPE_VECTOR);
+
+    let val = Val::Vec(vec![Val::Count(42)]);
+    let x0 = val.clone().to_valptr(Some(&ty)).unwrap();
+    let x0 = x0.val().unwrap();
+    let x1 = x0.try_into().unwrap();
+    assert_eq!(val, x1);
+}
+
+fn subnet() {
+    let ty: cxx::UniquePtr<_> = Type::Set(SetType(vec![Type::Subnet])).try_into().unwrap();
+
+    let i = vec![Val::Subnet(IpNetwork::from_str("::/1").unwrap())];
+
+    let val = Val::Set(vec![i]);
+    let x0 = val.clone().to_valptr(Some(&ty)).unwrap();
+    let x1: Val = x0.val().unwrap().try_into().unwrap();
+    assert_eq!(val, x1);
 }

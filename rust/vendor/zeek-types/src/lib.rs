@@ -2,8 +2,12 @@
 
 mod error;
 mod event;
+pub mod types;
 mod val;
 mod zval;
+
+#[cfg(feature = "proptest")]
+pub use val::arbitrary_val;
 
 use core::str;
 use cxx::{CxxVector, UniquePtr};
@@ -14,13 +18,8 @@ use std::{
     pin::Pin,
 };
 
-use crate::zval::TypedZVal;
-
-pub use crate::{
-    error::Error,
-    event::Event,
-    val::{TypeId, Val},
-};
+pub use crate::{error::Error, event::Event, val::Val, zval::TypedZVal};
+pub use ipnetwork::{IpNetwork, Ipv4Network, Ipv6Network};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -28,9 +27,9 @@ type Result<T> = std::result::Result<T, Error>;
 pub mod zeek {
     pub use crate::ffi::{
         AddrVal, Args, EnumType, EnumVal, EnumValPtr, EventMetadataDescriptor, ListVal, PatternVal,
-        PortVal, RE_Matcher, RecordType, RecordVal, StringVal, SubNetVal, TableType, TableVal,
-        Type, TypeList, TypeListPtr, TypePtr, TypeTag, Val, ValPtr, VectorType, VectorVal,
-        base_type,
+        PortVal, RE_Matcher, RecordType, RecordVal, StringVal, SubNetVal, TableType, TableTypePtr,
+        TableVal, Type, TypeList, TypeListPtr, TypePtr, TypeTag, Val, ValPtr, VectorType,
+        VectorVal, base_type,
     };
 
     pub mod cluster {
@@ -50,9 +49,9 @@ pub mod zeek {
 pub mod support {
     pub use crate::ByteBufferWriter;
     pub use crate::ffi::{
-        ByteBuffer, PluginWrapper, TableEntry, TableIterator, ValPtrVector, event_add_metadata,
-        event_make, event_name, event_registry_lookup_event_arg_type,
-        event_registry_lookup_metadata,
+        ByteBuffer, PluginWrapper, TableEntry, TableIterator, TypePtrVector, ValPtrVector,
+        event_add_metadata, event_make, event_name, event_registry_lookup_event_arg_type,
+        event_registry_lookup_metadata, val_manager_port, zeek_id_find_type,
     };
 }
 
@@ -148,6 +147,7 @@ mod ffi {
         type EnumVal;
         type EnumValPtr;
         type SubNetVal;
+        type TableTypePtr;
         type TableVal;
         type TypeListPtr;
         type TypePtr;
@@ -179,8 +179,8 @@ mod ffi {
         fn Idx(self: &ListVal, i: usize) -> &ValPtr;
 
         type RecordType;
-        unsafe fn GetFieldType(self: &RecordType, field_name: *const c_char) -> &TypePtr;
-        unsafe fn HasField(self: &RecordType, field_name: *const c_char) -> bool;
+        unsafe fn GetFieldType(self: &RecordType, field_index: i32) -> &TypePtr;
+        unsafe fn FieldOffset(self: &RecordType, field_name: *const c_char) -> i32;
         fn GetName(self: &RecordType) -> &CxxString;
 
         fn NumFields(self: &RecordType) -> i32;
@@ -299,6 +299,12 @@ mod ffi {
         fn make(initial_capacity: usize) -> UniquePtr<ValPtrVector>;
         fn push(self: Pin<&mut ValPtrVector>, val: UniquePtr<ValPtr>);
 
+        type TypePtrVector;
+        #[Self = "TypePtrVector"]
+        #[must_use]
+        fn make(initial_capacity: usize) -> UniquePtr<TypePtrVector>;
+        fn push(self: Pin<&mut TypePtrVector>, val: UniquePtr<TypePtr>);
+
         type TableIterator<'a>;
         fn next<'a>(self: &TableIterator<'a>) -> UniquePtr<TableEntry<'a>>;
 
@@ -343,16 +349,16 @@ mod ffi {
         fn make_time(secs: f64) -> UniquePtr<ValPtr>;
 
         #[must_use]
-        fn make_vector(xs: UniquePtr<ValPtrVector>) -> UniquePtr<ValPtr>;
+        fn make_vector(xs: UniquePtr<ValPtrVector>, vector_type: &TypePtr) -> UniquePtr<ValPtr>;
 
         #[must_use]
-        fn make_set(keys: UniquePtr<ValPtrVector>, ty: &TableType) -> UniquePtr<ValPtr>;
+        fn make_set(keys: UniquePtr<ValPtrVector>, table_type: &TypePtr) -> UniquePtr<ValPtr>;
 
         #[must_use]
         fn make_table(
             keys: UniquePtr<ValPtrVector>,
             values: UniquePtr<ValPtrVector>,
-            ty: &TableType,
+            table_type: &TypePtr,
         ) -> UniquePtr<ValPtr>;
 
         #[must_use]
@@ -373,8 +379,19 @@ mod ffi {
         fn make_record(
             names: &[&str],
             data: UniquePtr<ValPtrVector>,
-            ty: &RecordType,
+            ty: &TypePtr,
         ) -> Result<UniquePtr<ValPtr>>;
+
+        fn to_owned_type(ty: &TypePtr) -> UniquePtr<TypePtr>;
+
+        #[must_use]
+        fn make_vector_type(yield_: &TypePtr) -> UniquePtr<TypePtr>;
+
+        #[must_use]
+        fn make_table_type(
+            key: UniquePtr<TypePtrVector>,
+            val: UniquePtr<TypePtr>,
+        ) -> UniquePtr<TypePtr>;
     }
 
     #[namespace = "::support"]
@@ -485,6 +502,7 @@ impl ffi::VectorVal {
     }
 
     fn at(&self, idx: u32) -> TypedZVal<'_> {
+        assert!(idx < self.Size(), "{} vs {}", idx, self.Size());
         let zval = unsafe { ffi::vec_val_at(self, idx) };
         TypedZVal::new(zval)
     }
@@ -496,7 +514,6 @@ pub struct VectorValIter<'a> {
     size: u32,
 }
 
-// TODO(bbannier): implement ExactSizeIterator as well, at least `len`.
 impl<'a> Iterator for VectorValIter<'a> {
     type Item = TypedZVal<'a>;
 
@@ -644,11 +661,12 @@ impl ffi::RecordType {
             CString::new(field_name).expect("field names should not contain embedded null bytes");
         let field_name = field_name.as_ptr();
 
-        if !unsafe { self.HasField(field_name) } {
+        let field_index = unsafe { self.FieldOffset(field_name) };
+        if field_index < 0 {
             return None;
         }
 
-        Some(unsafe { self.GetFieldType(field_name) })
+        Some(unsafe { self.GetFieldType(field_index) })
     }
 }
 

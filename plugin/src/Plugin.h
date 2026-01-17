@@ -6,7 +6,6 @@ namespace Zeek_more_serializers {
 
 class Plugin : public zeek::plugin::Plugin {
 protected:
-  // Overridden from zeek::plugin::Plugin.
   zeek::plugin::Configuration Configure() override;
 };
 

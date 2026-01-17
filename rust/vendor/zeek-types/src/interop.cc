@@ -102,19 +102,19 @@ TypedZVal record_get_field(const zeek::RecordVal &rec, int32_t field) {
   return TypedZVal{.val = &x, .type_ = ty.get()};
 }
 
-std::unique_ptr<zeek::ValPtr> make_vector(std::unique_ptr<ValPtrVector> xs) {
+std::unique_ptr<zeek::ValPtr> make_vector(std::unique_ptr<ValPtrVector> xs,
+                                          const zeek::TypePtr &vector_type) {
   if (!xs)
     return nullptr;
 
-  auto ty =
-      zeek::make_intrusive<zeek::VectorType>(zeek::base_type(zeek::TYPE_ANY));
+  auto ty = zeek::cast_intrusive<zeek::VectorType>(vector_type);
   auto result = zeek::make_intrusive<zeek::VectorVal>(std::move(ty));
 
   auto &&vals = std::move(*xs).data();
   result->Resize(vals.size());
 
   for (size_t i = 0; i < vals.size(); ++i) {
-    if (auto &&val = vals[i])
+    if (auto &&val = std::move(vals[i]))
       result->Assign(i, std::move(val));
   }
 
@@ -131,7 +131,11 @@ std::unique_ptr<zeek::ValPtr> make_list(std::unique_ptr<ValPtrVector> xs) {
   return wrap(list);
 }
 
-std::unique_ptr<zeek::ValPtr> make_null() { return wrap(zeek::ValPtr()); }
+std::unique_ptr<zeek::TypePtr> to_owned_type(const zeek::TypePtr &ty) {
+  return std::make_unique<zeek::TypePtr>(ty);
+}
+
+std::unique_ptr<zeek::ValPtr> make_null() { return wrap(zeek::Val::nil); }
 std::unique_ptr<zeek::ValPtr> make_bool(bool x) {
   return wrap(zeek::val_mgr->Bool(x));
 }
@@ -196,9 +200,8 @@ struct UnknownField : std::runtime_error {
 
 std::unique_ptr<zeek::ValPtr> make_record(rust::Slice<const rust::Str> names,
                                           std::unique_ptr<ValPtrVector> data_,
-                                          const zeek::RecordType &ty) {
-  auto t = cast_intrusive<zeek::RecordType>(
-      const_cast<zeek::RecordType &>(ty).ShallowClone());
+                                          const zeek::TypePtr &record_type) {
+  auto t = cast_intrusive<zeek::RecordType>(record_type);
   auto rec = zeek::make_intrusive<zeek::RecordVal>(t);
 
   auto data = std::move(*data_).data();
@@ -206,7 +209,7 @@ std::unique_ptr<zeek::ValPtr> make_record(rust::Slice<const rust::Str> names,
   for (size_t i = 0; i < names.size(); ++i) {
     const auto &n = names[i];
     auto name = std::string{n.data(), n.size()};
-    auto idx = ty.FieldOffset(name.c_str());
+    auto idx = t->FieldOffset(name.c_str());
     if (idx < 0)
       throw UnknownField(name.data());
 
@@ -224,11 +227,10 @@ struct KeyValueInconsistent : std::runtime_error {
 };
 
 std::unique_ptr<zeek::ValPtr> make_set(std::unique_ptr<ValPtrVector> keys_,
-                                       const zeek::TableType &ty_) {
-  auto ty =
-      zeek::make_intrusive<zeek::TableType>(ty_.GetIndices(), ty_.Yield());
+                                       const zeek::TypePtr &table_type) {
+  auto ty = zeek::cast_intrusive<zeek::TableType>(table_type);
 
-  auto t = zeek::make_intrusive<zeek::TableVal>(ty);
+  auto t = zeek::make_intrusive<zeek::TableVal>(std::move(ty));
 
   auto keys = std::move(*keys_).data();
 
@@ -241,11 +243,9 @@ std::unique_ptr<zeek::ValPtr> make_set(std::unique_ptr<ValPtrVector> keys_,
 
 std::unique_ptr<zeek::ValPtr> make_table(std::unique_ptr<ValPtrVector> keys_,
                                          std::unique_ptr<ValPtrVector> values_,
-                                         const zeek::TableType &ty_) {
-  auto ty =
-      zeek::make_intrusive<zeek::TableType>(ty_.GetIndices(), ty_.Yield());
-
-  auto t = zeek::make_intrusive<zeek::TableVal>(ty);
+                                         const zeek::TypePtr &table_type) {
+  auto ty = zeek::cast_intrusive<zeek::TableType>(table_type);
+  auto t = zeek::make_intrusive<zeek::TableVal>(std::move(ty));
 
   auto keys = std::move(*keys_).data();
   auto values = std::move(*values_).data();
@@ -260,6 +260,23 @@ std::unique_ptr<zeek::ValPtr> make_table(std::unique_ptr<ValPtrVector> keys_,
   }
 
   return wrap(std::move(t));
+}
+
+std::unique_ptr<zeek::TypePtr> make_vector_type(const zeek::TypePtr &yield) {
+  auto ty = zeek::make_intrusive<zeek::VectorType>(yield);
+  return std::make_unique<zeek::TypePtr>(ty);
+}
+
+std::unique_ptr<zeek::TypePtr>
+make_table_type(std::unique_ptr<TypePtrVector> key_,
+                std::unique_ptr<zeek::TypePtr> val) {
+  auto key = zeek::make_intrusive<zeek::TypeList>();
+  std::ranges::for_each(std::move(*key_).data(),
+                        [&](auto &&x) { key->Append(x); });
+
+  auto yield = val ? std::move(*val) : nullptr;
+  return std::make_unique<zeek::TypePtr>(
+      zeek::make_intrusive<zeek::TableType>(key, std::move(yield)));
 }
 
 void byte_buffer_append(ByteBuffer &vec, rust::Slice<const uint8_t> data) {

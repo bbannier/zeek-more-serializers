@@ -1,17 +1,14 @@
-use crate::{UniquePtr, ffi::zeek_id_find_type, wrap_unsafe};
+use crate::{UniquePtr, wrap_unsafe, zeek};
 use core::slice;
 use derivative::Derivative;
 use ipnetwork::IpNetwork;
 use num_traits::cast::FromPrimitive;
 
-#[cfg(feature = "proptest")]
-use proptest::prelude::{Arbitrary, BoxedStrategy};
-
 use std::{borrow::Cow, collections::BTreeMap, net::IpAddr};
 
 use time::{Duration, OffsetDateTime};
 
-use crate::{Error, Result, TransportProto, ffi};
+use crate::{Error, Result, TransportProto, ffi, types::TypeId};
 
 /// Trait so we code can work with both `ffi::Val` and `ffi::ZVal`.
 pub trait ValInterface {
@@ -109,7 +106,7 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
 
         TypeTag::TYPE_ENUM => {
             let type_ = type_.as_enum_type().ok_or(Error::ValueUnset)?;
-            Self::Enum(TypeId(type_.GetName().to_string().into()), val.as_enum()?)
+            Self::Enum(TypeId::new(type_.GetName().to_string()), val.as_enum()?)
         },
 
         TypeTag::TYPE_PATTERN => {
@@ -147,7 +144,8 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
             .collect();
 
             if type_.IsSet() {
-                let xs = xs?.into_iter().map(|(k, _)| k).collect();
+                let xs = xs?;
+                let xs = xs.into_iter().map(|(k, _)| k).collect();
                 Val::Set(xs)
             } else {
                 Val::Table(xs?)
@@ -176,9 +174,7 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
                     Ok((name, val))
                 }).collect();
 
-            let name = ty.GetName().to_string();
-
-            Self::Record(TypeId(name.into()), fields?)
+            Self::Record(TypeId::new(ty.GetName().to_string()), fields?)
         }
 
         TypeTag::TYPE_LIST => {
@@ -230,7 +226,7 @@ pub enum Val<'a> {
     Time(OffsetDateTime),
     Vec(Vec<Val<'a>>),
     List(Vec<Val<'a>>),
-    Set(Vec<Vec<Val<'a>>>),
+    Set(#[derivative(PartialEq(compare_with = "compare_set"))] Vec<Vec<Val<'a>>>),
     Table(Vec<(Vec<Val<'a>>, Val<'a>)>),
     Pattern {
         exact: Cow<'a, str>,
@@ -239,14 +235,16 @@ pub enum Val<'a> {
     Record(TypeId<'a>, BTreeMap<Cow<'a, str>, Val<'a>>),
 }
 
-impl<'a> Val<'a> {
+impl Val<'_> {
     /// Convert the value into a Zeek value pointer.
+    ///
+    /// Passing `None` for `ty` implies `any` target type.
     ///
     /// # Errors
     ///
     /// Returns an error if the conversion of the value or any of its parts fail.
     #[allow(clippy::too_many_lines)]
-    pub fn to_valptr(&'a self, ty: Option<&'a ffi::TypePtr>) -> Result<UniquePtr<ffi::ValPtr>> {
+    pub fn to_valptr(self, ty_orig: Option<&ffi::TypePtr>) -> Result<UniquePtr<ffi::ValPtr>> {
         // We need special treatment for deserializing to an `any` since we might not have enough
         // type information (e.g., for empty containers)
         //
@@ -255,77 +253,117 @@ impl<'a> Val<'a> {
         //
         // TODO(bbannier): Revisit this once treatment of empty containers improves in Zeek, see
         // https://github.com/zeek/zeek/issues/5114 and https://github.com/zeek/zeek/issues/5115.
-        let ty = ty.and_then(ffi::TypePtr::val).and_then(|ty| {
-            if ty.Tag() == ffi::TypeTag::TYPE_ANY {
-                None
-            } else {
-                Some(ty)
-            }
+        //
+        // Map `TYPE_ANY` to `None`.
+        let ty = ty_orig.and_then(|t| {
+            t.val()
+                .filter(|ty| !matches!(ty.Tag(), zeek::TypeTag::TYPE_ANY))
         });
+
+        /// Helper macro to validate that the type tag matches what is expected for deserializing the current `Val`.
+        macro_rules! check_dest_type {
+            ($expected:expr) => {
+                ty.map(crate::ffi::Type::Tag)
+                    .map(|tag| {
+                        use crate::ffi::TypeTag;
+                        if tag == $expected {
+                            Ok(())
+                        } else {
+                            Err(Error::UnexpectedDestType {
+                                expected: $expected,
+                                actual: tag,
+                            })
+                        }
+                    })
+                    .unwrap_or_else(|| Ok(()))?;
+            };
+        }
 
         Ok(match self {
             Val::None => ffi::make_null(),
-            Val::Bool(x) => ffi::make_bool(*x),
-            Val::Count(x) => ffi::make_count(*x),
-            Val::Int(x) => ffi::make_int(*x),
-            Val::Double(x) => ffi::make_double(*x),
-            Val::String(x) => ffi::make_string(x),
-            Val::Pattern { exact, anywhere } => ffi::make_pattern(exact, anywhere),
-            Val::Interval(x) => ffi::make_interval(x.as_seconds_f64()),
+            Val::Bool(x) => {
+                check_dest_type!(TypeTag::TYPE_BOOL);
+                ffi::make_bool(x)
+            }
+            Val::Count(x) => {
+                check_dest_type!(TypeTag::TYPE_COUNT);
+                ffi::make_count(x)
+            }
+            Val::Int(x) => {
+                check_dest_type!(TypeTag::TYPE_INT);
+                ffi::make_int(x)
+            }
+            Val::Double(x) => {
+                check_dest_type!(TypeTag::TYPE_DOUBLE);
+                ffi::make_double(x)
+            }
+            Val::String(x) => {
+                check_dest_type!(TypeTag::TYPE_STRING);
+                ffi::make_string(&x)
+            }
+            Val::Pattern { exact, anywhere } => {
+                check_dest_type!(TypeTag::TYPE_PATTERN);
+                ffi::make_pattern(&exact, &anywhere)
+            }
+            Val::Interval(x) => {
+                check_dest_type!(TypeTag::TYPE_INTERVAL);
+                ffi::make_interval(x.as_seconds_f64())
+            }
             Val::Time(x) => {
+                check_dest_type!(TypeTag::TYPE_TIME);
+
                 let offset_ns = x.unix_timestamp_nanos();
                 let offset_ns = f64::from_i128(offset_ns)
                     .ok_or(Error::UnrepresentableTimeOffsetNanos(offset_ns))?;
                 let secs = offset_ns / 1e9;
                 ffi::make_time(secs)
             }
-            Val::Vec(xs) => {
-                let yield_ = ty
-                    .and_then(ffi::Type::as_vector_type)
-                    .map(ffi::VectorType::Yield);
-
-                let mut vals = ffi::ValPtrVector::make(xs.len());
-
-                for x in xs {
-                    vals.pin_mut().push(x.to_valptr(yield_)?);
-                }
-
-                ffi::make_vector(vals)
+            Val::Addr(x) => {
+                check_dest_type!(TypeTag::TYPE_ADDR);
+                ffi::make_addr(&x.to_string())
             }
-            Val::Addr(x) => ffi::make_addr(&x.to_string()),
-            Val::Subnet(x) => ffi::make_subnet(&x.network().to_string(), x.prefix()),
-            Val::Enum(name, x) => {
-                let ty = zeek_id_find_type(&name.0)
+            Val::Subnet(x) => {
+                check_dest_type!(TypeTag::TYPE_SUBNET);
+                ffi::make_subnet(&x.network().to_string(), x.prefix())
+            }
+            Val::Port { num, proto } => {
+                check_dest_type!(TypeTag::TYPE_PORT);
+                ffi::make_port(num, proto.into())
+            }
+            Val::Enum(id, x) => {
+                check_dest_type!(TypeTag::TYPE_ENUM);
+
+                let ty = zeek::id::find_type(id.name())
                     .val()
-                    .ok_or(Error::UnknownType(name.0.to_string()))?;
+                    .ok_or(Error::UnknownType(id.name().into()))?;
 
                 let ty = ty
                     .as_enum_type()
                     .ok_or_else(|| Error::UnexpectedTypeDefinition {
-                        type_: name.0.to_string(),
+                        type_: id.name().into(),
                         expected: ffi::TypeTag::TYPE_ENUM,
                         actual: ty.Tag(),
                     })?;
-                ffi::make_enum(*x, ty)
+                ffi::make_enum(x, ty)
             }
-            Val::Port { num, proto } => ffi::make_port(*num, (*proto).into()),
-            Val::Record(name, fields) => {
-                let ty = zeek_id_find_type(&name.0)
+            Val::Record(id, fields) => {
+                check_dest_type!(TypeTag::TYPE_RECORD);
+
+                let ty = zeek::id::find_type(id.name())
                     .val()
-                    .ok_or(Error::UnknownType(name.0.to_string()))?;
+                    .ok_or(Error::UnknownType(id.name().into()))?;
                 let ty = ty
                     .as_record_type()
                     .ok_or_else(|| Error::UnexpectedTypeDefinition {
-                        type_: name.0.to_string(),
+                        type_: id.name().into(),
                         expected: ffi::TypeTag::TYPE_RECORD,
                         actual: ty.Tag(),
                     })?;
 
                 let (names, data): (Vec<_>, Vec<_>) = fields
-                    .iter()
+                    .into_iter()
                     .filter_map(|(k, v)| {
-                        let k: &str = k;
-                        let ty = ty.get_field_type(k)?;
+                        let ty = ty.get_field_type(&k)?;
                         let v = v.to_valptr(Some(ty));
 
                         Some((k, v))
@@ -338,27 +376,30 @@ impl<'a> Val<'a> {
                     result.pin_mut().push(x?);
                 }
 
-                ffi::make_record(&names, result, ty)?
+                let names: Vec<_> = names.iter().map(AsRef::as_ref).collect();
+                ffi::make_record(
+                    &names,
+                    result,
+                    ty_orig.ok_or(Error::InsufficientTypeInformation)?,
+                )?
+            }
+            Val::Vec(xs) => {
+                check_dest_type!(TypeTag::TYPE_VECTOR);
+
+                let yield_ = zeek::base_type(zeek::TypeTag::TYPE_ANY);
+
+                let mut vals = ffi::ValPtrVector::make(xs.len());
+
+                for x in xs {
+                    vals.pin_mut().push(x.to_valptr(Some(yield_))?);
+                }
+
+                ffi::make_vector(vals, ty_orig.ok_or(Error::InsufficientTypeInformation)?)
             }
             Val::List(xs) => {
-                let tys = ty
-                    .and_then(|ty| {
-                        if ty.Tag() == ffi::TypeTag::TYPE_LIST {
-                            ty.as_type_list()
-                        } else {
-                            None
-                        }
-                    })
-                    .map(ffi::TypeList::GetTypes);
-
-                if let Some(tys) = tys
-                    && xs.len() != tys.len()
-                {
-                    Err(Error::InconsistentTableIndex {
-                        expected: tys.len(),
-                        actual: xs.len(),
-                    })?;
-                }
+                // Cannot check the dest type here since Zeek has no concept of a "ListType".
+                // Instead lists are encoded with a `TypeTag == TYPE_LIST`, but with a type of the
+                // list elements.
 
                 if xs.iter().any(|x| matches!(x, Val::None)) {
                     Err(Error::ValueUnset)?;
@@ -366,54 +407,71 @@ impl<'a> Val<'a> {
 
                 let mut vals = ffi::ValPtrVector::make(xs.len());
 
-                for (i, x) in xs.iter().enumerate() {
-                    let ty = tys.and_then(|ty| ty.get(i));
-                    vals.pin_mut().push(x.to_valptr(ty)?);
+                for x in xs {
+                    vals.pin_mut().push(x.to_valptr(ty_orig)?);
                 }
 
                 ffi::make_list(vals)
             }
             Val::Set(xs) => {
-                let ty = ty
-                    .and_then(|ty| {
-                        if ty.Tag() == ffi::TypeTag::TYPE_TABLE {
-                            ty.as_table_type()
-                        } else {
-                            None
-                        }
-                    })
-                    .ok_or(Error::ValueUnset)?;
+                check_dest_type!(TypeTag::TYPE_TABLE);
+
+                // Cannot encode to `any` target type.
+                let ty_ = ty.ok_or(Error::InsufficientTypeInformation)?;
+                let ty_orig = ty_orig.ok_or(Error::InsufficientTypeInformation)?;
+
+                let tt = if ty_.Tag() == zeek::TypeTag::TYPE_TABLE {
+                    ty_.as_table_type()
+                } else {
+                    None
+                }
+                .ok_or(Error::ValueUnset)?;
+
+                let key_type = tt.GetIndexTypes();
 
                 let mut keys = ffi::ValPtrVector::make(xs.len());
-                let index_types = ty.GetIndexTypes();
+
+                let mut num_keys = None;
                 for ks in xs {
-                    if ks.len() != index_types.len() {
-                        Err(Error::InconsistentTableIndex {
-                            expected: index_types.len(),
+                    if key_type.len() != ks.len() {
+                        return Err(Error::InconsistentTableIndex {
+                            expected: key_type.len(),
                             actual: ks.len(),
-                        })?;
+                        });
                     }
 
+                    if let Some(num_keys) = num_keys
+                        && num_keys != ks.len()
+                    {
+                        return Err(Error::InconsistentTableIndex {
+                            expected: num_keys,
+                            actual: ks.len(),
+                        });
+                    }
+
+                    num_keys = Some(ks.len());
+
                     let mut ks_ = ffi::ValPtrVector::make(ks.len());
-                    for (k, ty) in ks.iter().zip(index_types) {
+                    for (k, ty) in ks.into_iter().zip(key_type) {
                         ks_.pin_mut().push(k.to_valptr(Some(ty))?);
                     }
 
                     keys.pin_mut().push(ffi::make_list(ks_));
                 }
 
-                ffi::make_set(keys, ty)
+                ffi::make_set(keys, ty_orig)
             }
             Val::Table(xs) => {
-                let ty = ty
-                    .and_then(|ty| {
-                        if ty.Tag() == ffi::TypeTag::TYPE_TABLE {
-                            ty.as_table_type()
-                        } else {
-                            None
-                        }
-                    })
-                    .ok_or(Error::ValueUnset)?;
+                check_dest_type!(TypeTag::TYPE_TABLE);
+
+                // Cannot encode to `any` target type.
+                let ty = ty.ok_or(Error::InsufficientTypeInformation)?;
+                let ty = if ty.Tag() == ffi::TypeTag::TYPE_TABLE {
+                    ty.as_table_type()
+                } else {
+                    None
+                }
+                .ok_or(Error::ValueUnset)?;
 
                 let mut keys = ffi::ValPtrVector::make(xs.len());
                 let mut values = ffi::ValPtrVector::make(xs.len());
@@ -430,7 +488,7 @@ impl<'a> Val<'a> {
                     }
 
                     let mut ks_ = ffi::ValPtrVector::make(ks.len());
-                    for (k, ty) in ks.iter().zip(index_types) {
+                    for (k, ty) in ks.into_iter().zip(index_types) {
                         ks_.pin_mut().push(k.to_valptr(Some(ty))?);
                     }
 
@@ -438,7 +496,11 @@ impl<'a> Val<'a> {
                     values.pin_mut().push(v.to_valptr(Some(yield_type))?);
                 }
 
-                ffi::make_table(keys, values, ty)
+                ffi::make_table(
+                    keys,
+                    values,
+                    ty_orig.ok_or(Error::InsufficientTypeInformation)?,
+                )
             }
         })
     }
@@ -449,11 +511,13 @@ impl<'a> Val<'a> {
             Val::String(x) => Val::String(Cow::from(x.into_owned())),
             Val::Vec(x) => Val::Vec(x.into_iter().map(Val::into_owned).collect()),
             Val::List(x) => Val::List(x.into_iter().map(Val::into_owned).collect()),
-            Val::Set(x) => Val::Set(
-                x.into_iter()
+            Val::Set(x) => {
+                let x = x
+                    .into_iter()
                     .map(|k| k.into_iter().map(Val::into_owned).collect())
-                    .collect(),
-            ),
+                    .collect();
+                Val::Set(x)
+            }
             Val::Table(x) => Val::Table(
                 x.into_iter()
                     .map(|(k, v)| {
@@ -470,15 +534,15 @@ impl<'a> Val<'a> {
 
                 Val::Pattern { exact, anywhere }
             }
-            Val::Record(name, x) => {
-                let name = TypeId(Cow::from(name.0.into_owned()));
+            Val::Record(id, x) => {
+                let id = id.into_owned();
                 let x = x
                     .into_iter()
                     .map(|(k, v)| (Cow::from(k.into_owned()), v.into_owned()));
 
-                Val::Record(name, x.collect())
+                Val::Record(id, x.collect())
             }
-            Val::Enum(id, x) => Val::Enum(TypeId(Cow::from(id.0.into_owned())), x),
+            Val::Enum(id, x) => Val::Enum(id.into_owned(), x),
 
             // For the remaining variants we can simply pass the data through.
             Val::None => Val::None,
@@ -510,9 +574,22 @@ impl<'a> TryFrom<&'a ffi::ListVal> for Vec<Val<'a>> {
     fn try_from(value: &'a ffi::ListVal) -> Result<Self> {
         let len = usize::try_from(value.Length())?;
         (0..len)
-            .map(|i| value.Idx(i).val().ok_or(Error::ValueUnset)?.try_into())
+            .map(|i| {
+                value
+                    .Idx(i)
+                    .val()
+                    .map_or_else(|| Ok(Val::None), TryInto::try_into)
+            })
             .collect()
     }
+}
+
+fn compare_set<'a>(l: &Vec<Vec<Val<'a>>>, r: &Vec<Vec<Val<'a>>>) -> bool {
+    // Slightly funky: two sets are equal if all elements in one are contained
+    // in the other. This deals with our vecs which permit duplicates.
+    //
+    // TODO(bbannier): Somehow enforce uniqueness on the type level.
+    l.iter().all(|l| r.contains(l)) && r.iter().all(|r| l.contains(r))
 }
 
 fn compare_ipnetwork(a: &IpNetwork, b: &IpNetwork) -> bool {
@@ -586,127 +663,153 @@ impl ValInterface for ffi::Val {
     }
 }
 
-// Identifier of a custom Zeek type.
-//
-// NOTE: Ideally we'd have some cheap-to-copy ID like a `u64` directly from Zeek to refer to custom
-// types, but this doesn't seem to exist. The value here is static, but depending on the identifier
-// length might require considerable space.
-#[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct TypeId<'a>(Cow<'a, str>);
-
-impl<'a> TypeId<'a> {
-    pub fn new<S>(name: S) -> Self
-    where
-        S: Into<Cow<'a, str>>,
-    {
-        Self(name.into())
-    }
-
-    #[must_use]
-    pub fn name(&self) -> &str {
-        &self.0
-    }
-}
-
-impl TypeId<'_> {
-    #[must_use]
-    pub fn into_owned(self) -> TypeId<'static> {
-        todo!()
-    }
-}
-
 #[cfg(feature = "proptest")]
-impl Arbitrary for Val<'static> {
-    type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
+mod proptest_tools {
+    use crate::{TransportProto, Val, types::Type};
+    use ipnetwork::IpNetwork;
+    use ipnetwork::{Ipv4Network, Ipv6Network};
+    use proptest::prelude::*;
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use time::{Duration, OffsetDateTime};
 
-    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        use std::net::{Ipv4Addr, Ipv6Addr};
-
-        use ipnetwork::{Ipv4Network, Ipv6Network};
-        use proptest::prelude::*;
-
-        let leaf = prop_oneof![
-            any::<bool>().prop_map(Val::Bool),
-            any::<u64>().prop_map(Val::Count),
-            any::<i64>().prop_map(Val::Int),
-            any::<f64>().prop_map(Val::Double),
-            ("Notice::Type", 0..32u64).prop_map(|(id, n)| Val::Enum(TypeId::new(id), n)),
-            prop::collection::vec(any::<u8>(), 0..16).prop_map(|x| Val::String(x.into())),
-            (any::<u16>(), any::<TransportProto>()).prop_map(|(num, proto)| Val::Port {
-                num: num.into(), // FIXME(bbannier): constrain this on the type level.
-                proto
-            }),
-            any::<IpAddr>().prop_map(Val::Addr),
-            (any::<Ipv4Addr>(), 0..=32u8)
-                .prop_filter_map("invalid ipv4 address", |(addr, prefix)| {
-                    Some(Val::Subnet(IpNetwork::V4(
-                        Ipv4Network::new(addr, prefix).ok()?,
-                    )))
+    #[allow(clippy::too_many_lines)]
+    pub fn arbitrary_val(ty: crate::types::Type<'static>) -> BoxedStrategy<Val<'static>> {
+        match ty {
+            Type::Bool => any::<bool>().prop_map(Val::Bool).boxed(),
+            Type::Count => any::<u64>().prop_map(Val::Count).boxed(),
+            Type::Int => any::<i64>().prop_map(Val::Int).boxed(),
+            Type::Double => any::<f64>().prop_map(Val::Double).boxed(),
+            Type::String => prop::collection::vec(any::<u8>(), 0..16)
+                .prop_map(|x| Val::String(x.into()))
+                .boxed(),
+            Type::Port => (any::<u16>(), any::<TransportProto>())
+                .prop_map(|(num, proto)| Val::Port {
+                    num: num.into(), // FIXME(bbannier): constrain this on the type level.
+                    proto,
                 })
                 .boxed(),
-            (any::<Ipv6Addr>(), 0..=32u8).prop_filter_map(
-                "invalid ipv6 address",
-                |(addr, prefix)| Some(Val::Subnet(IpNetwork::V6(
-                    Ipv6Network::new(addr, prefix).ok()?
-                )))
-            ),
-            (-1_000_000..=1_000_000i64, any::<i32>()).prop_map(|(s, ns)| {
-                // Limit seconds range since Zeek interval loose precision near the edges of range.
-                Val::Interval(Duration::new(s, ns))
-            }),
-            (-1_000..1_000_000_000i64).prop_filter_map("invalid timestamp", |x| {
-                // Limit time range since Zeek time looses precision near edges of range.
-                Some(Val::Time(OffsetDateTime::from_unix_timestamp(x).ok()?))
-            }),
-            prop::collection::vec(prop::char::range(' ', '~'), 0..32)
+            Type::Addr => any::<IpAddr>().prop_map(Val::Addr).boxed(),
+            Type::Subnet => prop_oneof![
+                (any::<Ipv4Addr>(), 0..=32u8)
+                    .prop_filter_map("invalid ipv4 address", |(addr, prefix)| Some(Val::Subnet(
+                        IpNetwork::V4(Ipv4Network::new(addr, prefix).ok()?,)
+                    )))
+                    .boxed(),
+                (any::<Ipv6Addr>(), 0..=32u8).prop_filter_map(
+                    "invalid ipv6 address",
+                    |(addr, prefix)| Some(Val::Subnet(IpNetwork::V6(
+                        Ipv6Network::new(addr, prefix).ok()?
+                    )))
+                )
+            ]
+            .boxed(),
+
+            Type::Interval => (-1_000_000..=1_000_000i64, any::<i32>())
+                .prop_map(|(s, ns)| {
+                    // Limit seconds range since Zeek interval loose precision near the edges of range.
+                    Val::Interval(Duration::new(s, ns))
+                })
+                .boxed(),
+            Type::Time => {
+                (-1_000..1_000_000_000i64)
+                    .prop_filter_map("invalid timestamp", |x| {
+                        // Limit time range since Zeek time looses precision near edges of range.
+                        Some(Val::Time(OffsetDateTime::from_unix_timestamp(x).ok()?))
+                    })
+                    .boxed()
+            }
+            Type::Pattern => prop::collection::vec("[a-zA-Z]", 0..32)
                 .prop_map(|v| v.into_iter().collect::<String>())
                 .prop_map(|pat| Val::Pattern {
                     // We use the same pattern here to keep things consistent.
                     // TODO(bbannier): Constrain this on the API level.
                     exact: pat.clone().into(),
-                    anywhere: pat.into()
-                }),
-        ];
-
-        prop_oneof![
-            // Zeek vectors have `None` at holes.
-            prop_oneof![leaf.clone(), Just(Val::None),].prop_recursive(4, 4, 8, |inner| {
-                prop::collection::vec(inner.clone(), 0..10).prop_map(Val::Vec)
-            }),
-            leaf.clone().prop_recursive(4, 4, 8, |inner| {
-                prop::collection::vec(inner, 0..10).prop_map(Val::List)
-            }),
-            // FIXME(bbannier): set needs type information which we do not have in the test harness.
-            // leaf.clone().prop_recursive(4, 64, 10, |inner| {
-            //     (0..5usize, 0..5usize).prop_flat_map(move |(rows, cols)| {
-            //         prop::collection::vec(prop::collection::vec(inner.clone(), cols), rows)
-            //             .prop_map(Val::Set)
-            //     })
-            // }),
-            // TODO(bbannier):
-            // - Table
-            // - Record
-        ]
+                    anywhere: pat.into(),
+                })
+                .boxed(),
+            Type::Vec(xs) => {
+                let num_elements = 0..10;
+                match xs {
+                    // `vector of any`.
+                    None => {
+                        let any_val = prop_oneof![
+                            any::<Type>().prop_flat_map(arbitrary_val),
+                            Just(Val::None), // Holes.
+                        ];
+                        prop::collection::vec(any_val, num_elements)
+                            .prop_map(Val::Vec)
+                            .boxed()
+                    }
+                    Some(ty) => prop::collection::vec(
+                        prop_oneof![
+                            arbitrary_val(*ty),
+                            Just(Val::None), // Holes.
+                        ],
+                        num_elements,
+                    )
+                    .prop_map(Val::Vec)
+                    .boxed(),
+                }
+            }
+            Type::List(xs) => {
+                let num_elements = 0..10;
+                match xs {
+                    // list of any.
+                    None => {
+                        let any_val = any::<Type>()
+                            .prop_flat_map(arbitrary_val)
+                            .prop_filter("lists have no holes", |x| !matches!(x, Val::None));
+                        prop::collection::vec(any_val, num_elements)
+                            .prop_map(Val::List)
+                            .boxed()
+                    }
+                    Some(ty) => prop::collection::vec(arbitrary_val(*ty), num_elements)
+                        .prop_map(Val::List)
+                        .boxed(),
+                }
+            }
+            Type::Set(tys) => {
+                let elems: Vec<_> = tys.0.into_iter().map(arbitrary_val).collect();
+                let num_elements = 1..10;
+                prop::collection::vec(elems, num_elements)
+                    .prop_map(Val::Set)
+                    .boxed()
+            }
+            Type::Table(..) => {
+                todo!()
+            }
+            Type::Enum(id) => {
+                let id = id.into_owned();
+                (0..4u64)
+                    .prop_map(move |n| Val::Enum(id.clone(), n))
+                    .boxed()
+            }
+            Type::Record(..) => {
+                // Generating records from the type requires looking up field
+                // definitions which is very expensive. Skip them here.
+                todo!()
+            }
+        }
         .boxed()
+    }
+
+    impl Arbitrary for TransportProto {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Self>;
+
+        fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
+            use proptest::prelude::*;
+
+            prop_oneof![
+                Just(TransportProto::Unknown),
+                Just(TransportProto::Tcp),
+                Just(TransportProto::Udp),
+                Just(TransportProto::Icmp),
+            ]
+            .boxed()
+        }
     }
 }
 
 #[cfg(feature = "proptest")]
-impl Arbitrary for TransportProto {
-    type Parameters = ();
-    type Strategy = BoxedStrategy<Self>;
-
-    fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-        use proptest::prelude::*;
-
-        prop_oneof![
-            Just(TransportProto::Unknown),
-            Just(TransportProto::Tcp),
-            Just(TransportProto::Udp),
-            Just(TransportProto::Icmp),
-        ]
-        .boxed()
-    }
-}
+pub use proptest_tools::arbitrary_val;

@@ -11,6 +11,7 @@ pub struct TypedZVal<'a> {
 }
 
 impl<'a> TypedZVal<'a> {
+    #[must_use]
     pub fn new(raw: ffi::TypedZVal) -> Self {
         Self {
             inner: raw,
@@ -18,10 +19,12 @@ impl<'a> TypedZVal<'a> {
         }
     }
 
+    #[must_use]
     pub fn type_(&self) -> Option<&'a ffi::Type> {
         unsafe { self.inner.type_.as_ref() }
     }
 
+    #[must_use]
     pub fn value(&self) -> Option<&'a ffi::ZVal> {
         unsafe { self.inner.val.as_ref() }
     }

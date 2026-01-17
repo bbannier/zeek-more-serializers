@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <utility>
+#include <vector>
 
 #include "zeek/CompHash.h"
 #include "zeek/Dict.h"
@@ -46,20 +47,18 @@ private:
 };
 
 // Helper class to pass a vector of unique_ptr by value from Rust to C++.
-class ValPtrVector {
-  std::vector<zeek::ValPtr> vals;
+template <typename T> class PtrVector {
+  std::vector<T> vals;
 
 public:
-  ValPtrVector() = default;
-  ValPtrVector(const ValPtrVector &b) = delete;
-  ValPtrVector(ValPtrVector &&b) noexcept { std::swap(this->vals, b.vals); }
+  PtrVector() = default;
+  PtrVector(const PtrVector &) = delete;
+  PtrVector(PtrVector &&b) noexcept { std::swap(this->vals, b.vals); }
 
-  void push(std::unique_ptr<zeek::ValPtr> x) {
-    vals.emplace_back(std::move(*x));
-  }
+  void push(std::unique_ptr<T> x) { vals.emplace_back(std::move(*x)); }
 
   static auto make(size_t initial_capacity) {
-    auto xs = std::make_unique<ValPtrVector>();
+    auto xs = std::make_unique<PtrVector>();
     xs->vals.reserve(initial_capacity);
     return xs;
   }
@@ -68,17 +67,24 @@ public:
   auto data() && { return std::move(vals); }
 };
 
+using ValPtrVector = PtrVector<zeek::ValPtr>;
+using TypePtrVector = PtrVector<zeek::TypePtr>;
+
 struct TableIterator {
-  TableIterator(const zeek::TableVal &table)
-      : cur(table.Get()->begin()), end(table.Get()->end()),
-        h(table.GetTableHash()) {}
+  TableIterator(const zeek::TableVal &table) : dict(table.Get()) {
+    if (dict) {
+      cur = dict->begin();
+      end = dict->end();
+      h = table.GetTableHash();
+    }
+  }
 
   std::unique_ptr<TableEntry> next() const {
     // We _have_ to return a value and not a ref/ptr
     // here since the current entry is a local value.
     //
     // TODO(bbannier): Figure out a way to return a ref (with `ZVals`?).
-    if (cur == end)
+    if (!dict || cur == end)
       return nullptr;
 
     auto &val = *cur++;
@@ -88,6 +94,8 @@ struct TableIterator {
 
     return std::make_unique<TableEntry>(std::move(key), value);
   }
+
+  const zeek::PDict<zeek::TableEntryVal> *dict = nullptr;
 
   mutable zeek::DictIterator<zeek::TableEntryVal> cur;
   zeek::DictIterator<zeek::TableEntryVal> end;
@@ -109,6 +117,8 @@ const std::vector<zeek::TypePtr> &table_indices(const zeek::TableType &ty);
 std::unique_ptr<zeek::TypeList>
 make_typelist(rust::Slice<zeek::TypePtr *const> xs);
 
+std::unique_ptr<zeek::TypePtr> to_owned_type(const zeek::TypePtr &ty);
+
 std::unique_ptr<zeek::ValPtr> make_null();
 std::unique_ptr<zeek::ValPtr> make_bool(bool x);
 std::unique_ptr<zeek::ValPtr> make_count(uint64_t x);
@@ -118,7 +128,8 @@ std::unique_ptr<zeek::ValPtr> make_string(rust::Slice<const uint8_t> x);
 std::unique_ptr<zeek::ValPtr> make_pattern(rust::Str exact, rust::Str anywhere);
 std::unique_ptr<zeek::ValPtr> make_interval(double x);
 std::unique_ptr<zeek::ValPtr> make_time(double x);
-std::unique_ptr<zeek::ValPtr> make_vector(std::unique_ptr<ValPtrVector> xs);
+std::unique_ptr<zeek::ValPtr> make_vector(std::unique_ptr<ValPtrVector> xs,
+                                          const zeek::TypePtr &vector_type);
 std::unique_ptr<zeek::ValPtr> make_list(std::unique_ptr<ValPtrVector> xs);
 std::unique_ptr<zeek::ValPtr> make_addr(rust::Str x);
 std::unique_ptr<zeek::ValPtr> make_subnet(rust::Str x, uint8_t prefix);
@@ -126,12 +137,24 @@ std::unique_ptr<zeek::ValPtr> make_enum(uint64_t x, const zeek::EnumType &ty);
 std::unique_ptr<zeek::ValPtr> make_port(uint32_t num, TransportProto proto);
 std::unique_ptr<zeek::ValPtr> make_record(rust::Slice<const rust::Str> names,
                                           std::unique_ptr<ValPtrVector> data,
-                                          const zeek::RecordType &ty);
+                                          const zeek::TypePtr &record_type);
 std::unique_ptr<zeek::ValPtr> make_set(std::unique_ptr<ValPtrVector> keys,
-                                       const zeek::TableType &ty_);
+                                       const zeek::TypePtr &table_type);
 std::unique_ptr<zeek::ValPtr> make_table(std::unique_ptr<ValPtrVector> keys,
                                          std::unique_ptr<ValPtrVector> values,
-                                         const zeek::TableType &ty_);
+                                         const zeek::TypePtr &table_type);
+
+std::unique_ptr<zeek::TypePtr> make_vector_type(const zeek::TypePtr &yield);
+std::unique_ptr<zeek::TypePtr>
+make_table_type(std::unique_ptr<TypePtrVector> key,
+                std::unique_ptr<zeek::TypePtr> val);
+
+std::unique_ptr<zeek::TypePtr> to_owned_type(const zeek::TypePtr &ty);
+
+std::unique_ptr<zeek::TypePtr> make_vector_type(const zeek::TypePtr &yield);
+std::unique_ptr<zeek::TypePtr>
+make_table_type(std::unique_ptr<TypePtrVector> key,
+                std::unique_ptr<zeek::TypePtr> val);
 
 void byte_buffer_append(ByteBuffer &vec, rust::Slice<const uint8_t> data);
 

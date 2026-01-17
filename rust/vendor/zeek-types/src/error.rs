@@ -59,6 +59,15 @@ pub enum Error {
         actual: ffi::TypeTag,
     },
 
+    #[error("unexpected destination type '{actual:?}', expected '{expected:?}'")]
+    UnexpectedDestType {
+        expected: ffi::TypeTag,
+        actual: ffi::TypeTag,
+    },
+
+    #[error("insufficient type information to compute target type")]
+    InsufficientTypeInformation,
+
     #[error("utf8 error: {0}")]
     Utf8Error(#[from] Utf8Error),
 

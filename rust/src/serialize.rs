@@ -168,6 +168,7 @@ impl<'de> FromSchema<'de, Binary> for cxx::UniquePtr<zeek::cluster::Event> {
     where
         Self: Sized,
     {
+        // We do not look at the target type at all, and instead derive this from the parsed event type.
         let event = schema.try_into()?;
         Ok(event)
     }
@@ -179,6 +180,7 @@ impl<'de> FromSchema<'de, Human> for cxx::UniquePtr<zeek::ValPtr> {
     where
         Self: Sized,
     {
+        // We do not look at the target type at all, and instead derive this from the parsed event type.
         FromSchema::<Binary>::from_schema(schema, typ)
     }
 }
