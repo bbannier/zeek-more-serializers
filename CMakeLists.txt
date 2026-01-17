@@ -9,12 +9,6 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/plugin/src/config.h.in"
 
 add_subdirectory(rust)
 
-# Our plugin source and scripts are in a subdirectory
-set(BRO_PLUGIN_BASE "${CMAKE_CURRENT_SOURCE_DIR}/plugin")
-
-# Workaround to make header files in plugin sources available to BiFs.
-include_directories("${BRO_PLUGIN_BASE}/src")
-
 include(ZeekPlugin)
 
 zeek_plugin_begin(Zeek more_serializers)
@@ -25,3 +19,5 @@ zeek_plugin_dist_files(README COPYING)
 zeek_plugin_link_library(zeek_more_serializers_cxx)
 
 zeek_plugin_end()
+
+target_include_directories(Zeek_more_serializers PUBLIC "plugin/src")
