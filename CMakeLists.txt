@@ -1,5 +1,3 @@
-# This file is maintained by zkg. Do not edit.
-# Put required additional cmake functionality into plugin.cmake.
 cmake_minimum_required(VERSION 3.15.0 FATAL_ERROR)
 
 execute_process(
