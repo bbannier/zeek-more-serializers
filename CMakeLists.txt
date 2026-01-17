@@ -35,9 +35,3 @@ zeek_plugin_dist_files(README COPYING)
 zeek_plugin_link_library(zeek_more_serializers_cxx)
 
 zeek_plugin_end()
-
-if ("${PROJECT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
-    # Allows building rpm/deb packages via "make package" in build dir.
-    include(ConfigurePackaging)
-    ConfigurePackaging(${CMAKE_PROJECT_VERSION})
-endif ()
