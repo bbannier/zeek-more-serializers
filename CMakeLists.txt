@@ -2,16 +2,7 @@
 # Put required additional cmake functionality into plugin.cmake.
 cmake_minimum_required(VERSION 3.15.0 FATAL_ERROR)
 
-project(ZeekPluginmore_serializers)
-
-# Establish version numbers in config.h
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" VERSION LIMIT_COUNT 1)
-
-string(REGEX REPLACE "[.-]" " " version_numbers ${VERSION})
-separate_arguments(version_numbers)
-list(GET version_numbers 0 VERSION_MAJOR)
-list(GET version_numbers 1 VERSION_MINOR)
-list(GET version_numbers 2 VERSION_PATCH)
+project(ZeekPluginmore_serializers VERSION 0.1.0 LANGUAGES CXX)
 
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/plugin/src/config.h.in"
     "${CMAKE_CURRENT_BINARY_DIR}/config.h" @ONLY)
@@ -39,7 +30,7 @@ foreach(file ${bif_files})
     zeek_plugin_bif(${file})
 endforeach ()
 
-zeek_plugin_dist_files(README COPYING VERSION)
+zeek_plugin_dist_files(README COPYING)
 
 zeek_plugin_link_library(zeek_more_serializers_cxx)
 
@@ -48,5 +39,5 @@ zeek_plugin_end()
 if ("${PROJECT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
     # Allows building rpm/deb packages via "make package" in build dir.
     include(ConfigurePackaging)
-    ConfigurePackaging(${VERSION})
+    ConfigurePackaging(${CMAKE_PROJECT_VERSION})
 endif ()
