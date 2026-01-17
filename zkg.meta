@@ -1,5 +1,4 @@
 [package]
-script_dir = scripts
 build_command = cmake -Bbuild && cmake --build build
 test_command = cd testing && btest -c btest.cfg
 summary = More serializers for Zeek
