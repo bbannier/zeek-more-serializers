@@ -7,4 +7,6 @@ Zeek::more_serializers - Additional serializers (dynamic, version)
     [Type] Zeek::more_serializers::Format
     [Function] Zeek::more_serializers::serialize_val
     [Function] Zeek::more_serializers::deserialize_val
+    [Function] Zeek::more_serializers::detail::bench_storage
+    [Function] Zeek::more_serializers::detail::bench_event
 

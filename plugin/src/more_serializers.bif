@@ -5,6 +5,8 @@ module Zeek::more_serializers;
 #include <optional>
 
 #include "zeek_more_serializers_cxx/lib.h"
+#include "Plugin.h"
+#include "zeek/cluster/BifSupport.h"
 
 std::optional<Format> to_format(auto&& format) {
     auto* fmt_ = format->AsEnumVal();
@@ -72,4 +74,21 @@ function deserialize_val%(val: string, ty: any, format: Format%): any
         reporter->Error("%s", e.what());
         return nullptr;
     }
+%}
+
+module Zeek::more_serializers::detail;
+
+function bench_storage%(val: any%): any
+%{
+    assert(val);
+    Zeek_more_serializers::detail::benchmark::bench_storage(*val);
+    return {};
+%}
+
+function bench_event%(topic: string, ...%): any
+%{
+    auto args = zeek::ArgsSpan{*@ARGS@}.subspan(1);
+    // assert(val);
+    Zeek_more_serializers::detail::benchmark::bench_event({zeek::NewRef{}, topic}, args);
+    return {};
 %}

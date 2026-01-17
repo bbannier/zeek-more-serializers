@@ -1,18 +1,32 @@
 #include "Plugin.h"
 
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <exception>
+#include <iostream>
 #include <memory>
+#include <numeric>
 #include <optional>
+#include <unordered_map>
+#include <vector>
+#include <zeek/IntrusivePtr.h>
+#include <zeek/Reporter.h>
+#include <zeek/Val.h>
+#include <zeek/cluster/Backend.h>
+#include <zeek/cluster/BifSupport.h>
+#include <zeek/util-types.h>
 
+#include "zeek/broker/Manager.h"
 #include "zeek/cluster/Component.h"
 #include "zeek/cluster/Event.h"
 #include "zeek/cluster/Serializer.h"
+#include "zeek/cluster/serializer/broker/Serializer.h"
 #include "zeek/logging/Types.h"
 #include "zeek/storage/Component.h"
 #include "zeek/storage/Serializer.h"
+#include "zeek/storage/serializer/json/JSON.h"
 
 #include "config.h"
 #include "zeek_more_serializers_cxx/lib.h"
@@ -136,7 +150,7 @@ template <Format format> struct Serializer : zeek::cluster::LogSerializer {
 
 namespace Zeek_more_serializers {
 Plugin plugin;
-}
+} // namespace Zeek_more_serializers
 
 zeek::plugin::Configuration Zeek_more_serializers::Plugin::Configure() {
   AddComponent(new zeek::storage::SerializerComponent(
@@ -157,3 +171,138 @@ zeek::plugin::Configuration Zeek_more_serializers::Plugin::Configure() {
   config.version.patch = VERSION_PATCH;
   return config;
 }
+
+namespace Zeek_more_serializers::detail::benchmark {
+
+namespace {
+using Duration = std::chrono::duration<double>;
+using Measurements = std::vector<Duration>;
+using Timinig = std::unordered_map<std::string, Measurements>;
+
+Duration mean(const Measurements &xs) {
+  auto n = xs.size();
+  return std::accumulate(xs.begin(), xs.end(), Duration()) / n;
+}
+
+void summarize(const Timinig &t_serialize, const Timinig &t_deserialize) {
+  std::cout << "#name t_serialize t_deserialize n\n";
+  for (auto &&[name, dt] : t_serialize) {
+    auto n = dt.size();
+    auto mean_serialize = mean(dt);
+
+    auto &de = t_deserialize.at(name);
+    assert(de.size() == n);
+    auto mean_deserialize = mean(de);
+
+    std::cout << name << ' ' << mean_serialize << ' ' << mean_deserialize << ' '
+              << n << '\n';
+  }
+}
+
+size_t benchmark_iterations() {
+  size_t result = 1;
+
+  if (auto n = ::getenv("BENCHMARK_NUM")) {
+    auto len = ::strlen(n);
+    auto num = std::string_view{n, len};
+    std::from_chars(num.begin(), num.end(), result);
+  }
+
+  return result;
+}
+
+} // namespace
+
+void bench_storage(const zeek::Val &val_) {
+  auto val = const_cast<zeek::Val &>(val_).Clone();
+
+  std::unordered_map<std::string, std::unique_ptr<zeek::storage::Serializer>>
+      serializers;
+  serializers.emplace("binary",
+                      storage::Serializer<Format::Binary>::Instantiate());
+  serializers.emplace("human",
+                      storage::Serializer<Format::Human>::Instantiate());
+  serializers.emplace("zeek_json",
+                      zeek::storage::serializer::json::JSON::Instantiate());
+
+  Timinig t_serialize;
+  Timinig t_deserialize;
+
+  for (auto &[name, serializer] : serializers) {
+    for (int i = 0; i < benchmark_iterations(); ++i) {
+      // Serialize.
+      auto start = std::chrono::high_resolution_clock::now();
+      auto x = serializer->Serialize(val);
+      auto end = std::chrono::high_resolution_clock::now();
+      t_serialize[name].emplace_back(end - start);
+
+      const auto &type = val->GetType();
+
+      assert(x);
+      start = std::chrono::high_resolution_clock::now();
+      auto _ = serializer->Unserialize(*x, type);
+      end = std::chrono::high_resolution_clock::now();
+      t_deserialize[name].emplace_back(end - start);
+    }
+  }
+
+  summarize(t_serialize, t_deserialize);
+}
+
+void bench_event(const zeek::ValPtr &topic, zeek::ArgsSpan args) {
+  static const auto &cluster_event_type =
+      zeek::id::find_type<zeek::RecordType>("Cluster::Event");
+
+  if (args.size() != 1 || args[0]->GetType() != cluster_event_type) {
+    zeek::reporter->Error("expected a cluster event as only parameter");
+    return;
+  }
+
+  auto *rec = args[0]->AsRecordVal();
+  assert(rec);
+
+  const auto &func = rec->GetField<zeek::FuncVal>(0);
+  const auto &vargs = rec->GetField<zeek::VectorVal>(1);
+
+  // Need to copy from VectorVal to zeek::Args
+  zeek::Args args_(vargs->Size());
+  for (size_t i = 0; i < vargs->Size(); i++)
+    args_[i] = vargs->ValAt(i);
+
+  auto event = zeek::broker_mgr->MakeClusterEvent(func, args_);
+  assert(event);
+
+  std::unordered_map<std::string,
+                     std::unique_ptr<zeek::cluster::EventSerializer>>
+      serializers;
+  serializers.emplace(
+      "binary", cluster::event::Serializer<Format::Binary>::Instantiate());
+  serializers.emplace("human",
+                      cluster::event::Serializer<Format::Human>::Instantiate());
+  serializers.emplace("broker_binv1",
+                      new zeek::cluster::detail::BrokerBinV1_Serializer());
+  serializers.emplace("broker_jsonv1",
+                      new zeek::cluster::detail::BrokerJsonV1_Serializer());
+
+  Timinig t_serialize;
+  Timinig t_deserialize;
+
+  for (auto &&[name, s] : serializers) {
+    for (int i = 0; i < benchmark_iterations(); ++i) {
+      zeek::byte_buffer buf;
+
+      auto start = std::chrono::high_resolution_clock::now();
+      s->SerializeEvent(buf, *event);
+      auto end = std::chrono::high_resolution_clock::now();
+      t_serialize[name].emplace_back(end - start);
+
+      start = std::chrono::high_resolution_clock::now();
+      s->UnserializeEvent(buf);
+      end = std::chrono::high_resolution_clock::now();
+      t_deserialize[name].emplace_back(end - start);
+    }
+  }
+
+  summarize(t_serialize, t_deserialize);
+}
+} // namespace Zeek_more_serializers::detail::benchmark

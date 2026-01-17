@@ -1,5 +1,7 @@
 #pragma once
 
+#include <zeek/Val.h>
+#include <zeek/cluster/BifSupport.h>
 #include <zeek/plugin/Plugin.h>
 
 namespace Zeek_more_serializers {
@@ -11,5 +13,9 @@ protected:
 
 extern Plugin plugin;
 
+namespace detail::benchmark {
+void bench_storage(const zeek::Val &val);
+void bench_event(const zeek::ValPtr &topic, zeek::ArgsSpan args);
+} // namespace detail::benchmark
+
 } // namespace Zeek_more_serializers
-  // namespace zeek::plugin
