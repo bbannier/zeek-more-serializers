@@ -67,7 +67,7 @@ jobs:
           make -C testing
       - name: Upload test artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: btest-tmp
           path: testing/.tmp
