@@ -19,18 +19,9 @@ include(ZeekPlugin)
 
 zeek_plugin_begin(Zeek more_serializers)
 
-file(GLOB cc_files RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "plugin/src/*.cc")
-foreach(file ${cc_files})
-    zeek_plugin_cc(${file})
-endforeach ()
-
-file(GLOB bif_files RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "plugin/src/*.bif")
-foreach(file ${bif_files})
-    zeek_plugin_bif(${file})
-endforeach ()
-
+zeek_plugin_cc("plugin/src/Plugin.cc")
+zeek_plugin_bif("plugin/src/more_serializers.bif")
 zeek_plugin_dist_files(README COPYING)
-
 zeek_plugin_link_library(zeek_more_serializers_cxx)
 
 zeek_plugin_end()
