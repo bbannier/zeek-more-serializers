@@ -7,8 +7,10 @@
 #include <memory>
 #include <stdexcept>
 #include <string_view>
+#include <unordered_map>
 #include <zeek/ID.h>
 
+#include "zeek/EventHandler.h"
 #include "zeek/IPAddr.h"
 #include "zeek/IntrusivePtr.h"
 #include "zeek/Type.h"
@@ -295,12 +297,26 @@ struct UnknownEvent : std::runtime_error {
       : std::runtime_error(std::format("unknown event {}", name)) {}
 };
 
-std::unique_ptr<zeek::cluster::Event>
-event_make(rust::Str name_, std::unique_ptr<support::ValPtrVector> args_) {
-  auto name = std::string_view{name_.data(), name_.size()};
+zeek::EventHandler *event_lookup_cached(std::string_view name) {
+  static auto cache =
+      std::unordered_map<std::string_view, zeek::EventHandler *>{};
+
+  if (cache.contains(name))
+    return cache[name];
+
   auto *handler = zeek::event_registry->Lookup(name);
   if (!handler)
     throw UnknownEvent(name);
+
+  cache[name] = handler;
+  return handler;
+}
+
+std::unique_ptr<zeek::cluster::Event>
+event_make(rust::Str name_, std::unique_ptr<support::ValPtrVector> args_) {
+  auto name = std::string_view{name_.data(), name_.size()};
+  auto *handler = event_lookup_cached(name);
+  assert(handler);
 
   zeek::Args args;
   if (args_)
@@ -317,16 +333,27 @@ bool event_add_metadata(zeek::cluster::Event &event, const zeek::EnumValPtr &id,
 
 const zeek::EventMetadataDescriptor *
 event_registry_lookup_metadata(uint64_t id) {
-  return zeek::event_registry->LookupMetadata(id);
+  // Since Zeek has a bounded set of metadata values we can probably cache all
+  // values as well.
+  static auto cache =
+      std::unordered_map<uint64_t, const zeek::EventMetadataDescriptor *>{};
+
+  if (cache.contains(id))
+    return cache[id];
+
+  auto meta = zeek::event_registry->LookupMetadata(id);
+  if (meta)
+    cache[id] = meta;
+
+  return meta;
 }
 
 zeek::TypePtr const *event_registry_lookup_event_arg_type(rust::Str name_,
                                                           size_t idx) {
   auto name = std::string_view{name_.data(), name_.size()};
 
-  auto *handler = zeek::event_registry->Lookup(name);
-  if (!handler)
-    return nullptr;
+  auto *handler = event_lookup_cached(name);
+  assert(handler);
 
   auto &&ty = handler->GetType();
   if (!ty)
@@ -336,7 +363,9 @@ zeek::TypePtr const *event_registry_lookup_event_arg_type(rust::Str name_,
   if (!params)
     return nullptr;
 
-  return &params->GetFieldType(idx);
+  auto *type = &params->GetFieldType(idx);
+
+  return type;
 }
 
 const zeek::PortVal *val_manager_port(uint32_t port_num) {
