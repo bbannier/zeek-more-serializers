@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <cstring>
 #include <format>
+#include <iterator>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <unordered_map>
@@ -16,6 +18,7 @@
 #include "zeek/Type.h"
 #include "zeek/Val.h"
 
+#include "zeek/ZVal.h"
 #include "zeek/script_opt/CPP/RuntimeOps.h"
 
 #ifdef CORROSION_BUILD
@@ -109,16 +112,23 @@ std::unique_ptr<zeek::ValPtr> make_vector(std::unique_ptr<ValPtrVector> xs,
   if (!xs)
     return nullptr;
 
-  auto ty = zeek::cast_intrusive<zeek::VectorType>(vector_type);
-  auto result = zeek::make_intrusive<zeek::VectorVal>(std::move(ty));
-
   auto &&vals = std::move(*xs).data();
-  result->Resize(vals.size());
+  std::vector<std::optional<zeek::ZVal>> elements;
+  elements.reserve(vals.size());
 
-  for (size_t i = 0; i < vals.size(); ++i) {
-    if (auto &&val = std::move(vals[i]))
-      result->Assign(i, std::move(val));
-  }
+  std::ranges::transform(std::move(vals), std::back_inserter(elements),
+                         [](auto &v) -> std::optional<zeek::ZVal> {
+                           if (v) {
+                             auto ty = v->GetType();
+                             return zeek::ZVal(std::move(v), ty);
+                           }
+                           return {};
+                         });
+
+  auto ty = zeek::cast_intrusive<zeek::VectorType>(vector_type);
+
+  // This constructor secretely moves from `elements`.
+  auto result = zeek::make_intrusive<zeek::VectorVal>(std::move(ty), &elements);
 
   return wrap(std::move(result));
 }
