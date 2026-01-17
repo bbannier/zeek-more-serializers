@@ -20,6 +20,7 @@ fn main() -> Result<(), String> {
             .flag_if_supported("-Wno-unused-parameter")
             .flag_if_supported("-Wno-unused-variable")
             .std("c++20")
+            .debug(zeek_debug_build()?)
             .compile("zeek-types");
 
         rerun_if_changed!("build.rs");
@@ -34,12 +35,21 @@ fn main() -> Result<(), String> {
 }
 
 fn zeek_include_dirs() -> Result<Vec<String>, String> {
+    let stdout = zeek_config("--include_dir")?;
+    Ok(stdout.split(':').map(str::to_owned).collect())
+}
+
+fn zeek_debug_build() -> Result<bool, String> {
+    let stdout = zeek_config("--build_dir")?;
+    Ok(stdout.to_lowercase().contains("debug"))
+}
+
+fn zeek_config(flag: &str) -> Result<String, String> {
     rerun_if_env_changed!("PATH");
     let output = Command::new("zeek-config")
-        .arg("--include_dir")
+        .arg(flag)
         .output()
         .map_err(|e| e.to_string())?;
 
-    let stdout = String::from_utf8(output.stdout).map_err(|e| e.to_string())?;
-    Ok(stdout.split(':').map(str::to_owned).collect())
+    String::from_utf8(output.stdout).map_err(|e| e.to_string())
 }
