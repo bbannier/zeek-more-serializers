@@ -10,12 +10,6 @@
 set -e
 command="$0 $*"
 
-if [ -e "$(dirname "$0")/configure.plugin" ]; then
-    # Include custom additions.
-    # shellcheck disable=SC1091
-    . "$(dirname "$0")/configure.plugin"
-fi
-
 usage() {
 
     cat 1>&2 <<EOF
