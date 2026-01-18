@@ -84,7 +84,7 @@ fn vector() {
 fn subnet() {
     let ty: cxx::UniquePtr<_> = Type::Set(SetType(vec![Type::Subnet])).try_into().unwrap();
 
-    let i = vec![Val::Subnet(IpNetwork::from_str("::/1").unwrap())];
+    let i = vec![Val::Subnet(IpNetwork::from_str("::/1").unwrap())].into_boxed_slice();
 
     let val = Val::Set(vec![i]);
     let x0 = val.clone().to_valptr(Some(&ty)).unwrap();

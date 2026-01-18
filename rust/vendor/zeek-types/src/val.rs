@@ -134,7 +134,7 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
                 // TODO(bbannier): Figure out a way to iterate tables which returns references
                 // so we can avoid the copy.
 
-                let key: Result<Vec<Val>> = cur.key().try_into();
+                let key: Result<Box<[Val]>> = cur.key().try_into();
                 let key = key.map(|x| x.into_iter().map(Val::into_owned).collect());
 
                 let val =  cur.value_ref().map_or(Ok(Val::None), TryInto::try_into);
@@ -225,9 +225,9 @@ pub enum Val<'a> {
     Interval(Duration),
     Time(OffsetDateTime),
     Vec(Vec<Val<'a>>),
-    List(Vec<Val<'a>>),
-    Set(#[derivative(PartialEq(compare_with = "compare_set"))] Vec<Vec<Val<'a>>>),
-    Table(Vec<(Vec<Val<'a>>, Val<'a>)>),
+    List(Box<[Val<'a>]>),
+    Set(#[derivative(PartialEq(compare_with = "compare_set"))] Vec<Box<[Val<'a>]>>),
+    Table(Vec<(Box<[Val<'a>]>, Val<'a>)>),
     Pattern {
         exact: Cow<'a, str>,
         anywhere: Cow<'a, str>,
@@ -568,7 +568,7 @@ impl<'a> TryFrom<&'a ffi::Val> for Val<'a> {
     }
 }
 
-impl<'a> TryFrom<&'a ffi::ListVal> for Vec<Val<'a>> {
+impl<'a> TryFrom<&'a ffi::ListVal> for Box<[Val<'a>]> {
     type Error = Error;
 
     fn try_from(value: &'a ffi::ListVal) -> Result<Self> {
@@ -584,7 +584,7 @@ impl<'a> TryFrom<&'a ffi::ListVal> for Vec<Val<'a>> {
     }
 }
 
-fn compare_set<'a>(l: &Vec<Vec<Val<'a>>>, r: &Vec<Vec<Val<'a>>>) -> bool {
+fn compare_set<'a>(l: &Vec<Box<[Val<'a>]>>, r: &Vec<Box<[Val<'a>]>>) -> bool {
     // Slightly funky: two sets are equal if all elements in one are contained
     // in the other. This deals with our vecs which permit duplicates.
     //
@@ -760,18 +760,24 @@ mod proptest_tools {
                             .prop_flat_map(arbitrary_val)
                             .prop_filter("lists have no holes", |x| !matches!(x, Val::None));
                         prop::collection::vec(any_val, num_elements)
+                            .prop_map(Vec::into_boxed_slice)
                             .prop_map(Val::List)
                             .boxed()
                     }
                     Some(ty) => prop::collection::vec(arbitrary_val(*ty), num_elements)
+                        .prop_map(Vec::into_boxed_slice)
                         .prop_map(Val::List)
                         .boxed(),
                 }
             }
             Type::Set(tys) => {
-                let elems: Vec<_> = tys.0.into_iter().map(arbitrary_val).collect();
-                let num_elements = 1..10;
-                prop::collection::vec(elems, num_elements)
+                let elems = tys
+                    .0
+                    .into_iter()
+                    .map(arbitrary_val)
+                    .collect::<Vec<_>>()
+                    .prop_map(Vec::into_boxed_slice);
+                prop::collection::vec(elems, 1..4)
                     .prop_map(Val::Set)
                     .boxed()
             }
