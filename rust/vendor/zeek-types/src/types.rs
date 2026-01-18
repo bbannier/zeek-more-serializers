@@ -33,6 +33,8 @@ impl TypeId<'_> {
 
 #[cfg(feature = "proptest")]
 mod proptest_tools {
+    use std::mem::discriminant;
+
     use crate::types::TypeId;
     use {
         crate::{Error, ffi, support, zeek},
@@ -41,7 +43,7 @@ mod proptest_tools {
 
     /// Model for `zeek::Type`.
     ///
-    #[derive(Debug, Clone, PartialEq, Hash, Eq, PartialOrd, Ord)]
+    #[derive(Debug, Clone, Hash, Eq, PartialOrd, Ord)]
     pub enum Type<'a> {
         Bool,
         Count,
@@ -62,8 +64,43 @@ mod proptest_tools {
         Record(TypeId<'a>),
     }
 
+    impl PartialEq for Type<'_> {
+        fn eq(&self, other: &Self) -> bool {
+            match (self, other) {
+                (Type::Set(x), Type::Table(y)) => return x == y,
+                (Type::Table(x), Type::Set(y)) => return x == y,
+                _ => {}
+            }
+
+            if discriminant(self) != discriminant(other) {
+                return false;
+            }
+
+            match (self, other) {
+                (Type::Bool, Type::Bool)
+                | (Type::Count, Type::Count)
+                | (Type::Int, Type::Int)
+                | (Type::Double, Type::Double)
+                | (Type::String, Type::String)
+                | (Type::Port, Type::Port)
+                | (Type::Addr, Type::Addr)
+                | (Type::Subnet, Type::Subnet)
+                | (Type::Interval, Type::Interval)
+                | (Type::Time, Type::Time)
+                | (Type::Pattern, Type::Pattern) => true,
+                (Type::Vec(x), Type::Vec(y)) => x == y,
+                (Type::List(x), Type::List(y)) => x == y,
+                (Type::Set(x), Type::Set(y)) => x == y,
+                (Type::Table(x), Type::Table(y)) => x == y,
+                (Type::Enum(x), Type::Enum(y)) | (Type::Record(x), Type::Record(y)) => x == y,
+                _ => false,
+            }
+        }
+    }
+
     impl Type<'_> {
-        fn into_owned(self) -> Type<'static> {
+        #[must_use]
+        pub fn into_owned(self) -> Type<'static> {
             match self {
                 Type::Bool => Type::Bool,
                 Type::Count => Type::Count,
@@ -155,10 +192,46 @@ mod proptest_tools {
                 TypeTag::TYPE_INTERVAL => Type::Interval,
                 TypeTag::TYPE_TIME => Type::Time,
                 TypeTag::TYPE_PATTERN => Type::Pattern,
-                TypeTag::TYPE_VECTOR => todo!(),
-                TypeTag::TYPE_TABLE => todo!(),
-                TypeTag::TYPE_ENUM => todo!(),
-                TypeTag::TYPE_RECORD => todo!(),
+                TypeTag::TYPE_VECTOR => {
+                    let yield_ = value
+                        .as_vector_type()
+                        .ok_or(Error::ValueUnset)?
+                        .Yield()
+                        .val()
+                        .ok_or(Error::ValueUnset)?;
+                    Type::Vec(Box::new(yield_.try_into()?))
+                }
+                TypeTag::TYPE_TABLE => {
+                    let type_ = value.as_table_type().ok_or(Error::ValueUnset)?;
+
+                    let key = type_.GetIndexTypes();
+                    let key: Result<Vec<_>, Self::Error> = key
+                        .iter()
+                        .map(|k| {
+                            let k = k.val().ok_or(Error::ValueUnset)?;
+                            let k: Type = k.try_into()?;
+                            Ok(k)
+                        })
+                        .collect();
+
+                    let val = type_
+                        .Yield()
+                        .val()
+                        .map(|v| v.try_into().map(Box::new))
+                        .transpose();
+
+                    Type::Table(TableType(key?, val?))
+                }
+                TypeTag::TYPE_ENUM => {
+                    let name = value.as_enum_type().ok_or(Error::ValueUnset)?.GetName();
+                    let name = TypeId(name.to_string_lossy());
+                    Type::Enum(name.into_owned())
+                }
+                TypeTag::TYPE_RECORD => {
+                    let name = value.as_record_type().ok_or(Error::ValueUnset)?.GetName();
+                    let name = TypeId(name.to_string_lossy());
+                    Type::Record(name.into_owned())
+                }
                 _ => Err(Error::UnknownTypeTag(tag))?,
             })
         }
@@ -286,6 +359,22 @@ mod proptest_tools {
             let value = value.map(|x| Box::new((*x).into_owned()));
 
             TableType(key, value)
+        }
+    }
+
+    impl PartialEq<SetType<'_>> for TableType<'_> {
+        fn eq(&self, other: &SetType) -> bool {
+            if self.1.is_some() {
+                return false;
+            }
+
+            self.0 == other.0
+        }
+    }
+
+    impl PartialEq<TableType<'_>> for SetType<'_> {
+        fn eq(&self, other: &TableType<'_>) -> bool {
+            return other == self;
         }
     }
 }

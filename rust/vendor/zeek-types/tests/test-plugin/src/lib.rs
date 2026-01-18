@@ -20,15 +20,13 @@ fn init() {
     let _ = &*_PLUGIN;
 }
 
-type Result<T> = std::result::Result<T, Error>;
-
 struct TestPlugin(#[allow(unused)] UniquePtr<PluginWrapper>);
 
 impl TestPlugin {
     fn run_tests() {
         vector();
         subnet();
-        check_round_trip().unwrap();
+        check_round_trip();
     }
 
     fn new() -> Self {
@@ -39,7 +37,7 @@ impl TestPlugin {
     }
 }
 
-fn check_round_trip() -> Result<()> {
+fn check_round_trip() {
     let mut runner = TestRunner::new(Config {
         test_name: Some("check_round_trip"),
         source_file: Some(std::file!()),
@@ -51,23 +49,41 @@ fn check_round_trip() -> Result<()> {
 
     runner
         .run(&strategy, |(ty, x0)| {
-            let ty: cxx::UniquePtr<_> = ty.try_into().expect("type should be compatible with Zeek");
+            {
+                // Check type roundtrip. We ignore list types since Zeek has no list type.
+                if !matches!(ty, Type::List(..)) {
+                    let x: cxx::UniquePtr<_> = ty.clone().try_into()?;
+                    let x1 = x.val().ok_or(Error::ValueUnset)?;
+                    let x1: Type = x1.try_into()?;
+
+                    assert_eq!(ty, x1);
+                }
+
+                // Check `Type::into_owned`.
+                assert_eq!(ty.clone().into_owned(), ty);
+            }
+
+            let ty: cxx::UniquePtr<_> = ty
+                .clone()
+                .try_into()
+                .expect("type should be compatible with Zeek");
 
             // We cannot create Zeek values from naked `None` values.
             assert!(!matches!(&x0, Val::None));
 
-            let x = x0.clone().to_valptr(Some(&*ty))?;
-            let x = x.val().ok_or(Error::ValueUnset)?;
-            let x1: Val = x.try_into()?;
+            {
+                // Check value roundtrip.
+                let x = x0.clone().to_valptr(Some(&*ty))?;
+                let x = x.val().ok_or(Error::ValueUnset)?;
+                let x1: Val = x.try_into()?;
 
-            assert_eq!(x0, x1);
+                assert_eq!(x0, x1);
+            }
             Ok(())
         })
         .unwrap();
 
     println!("{runner}");
-
-    Ok(())
 }
 
 fn vector() {
