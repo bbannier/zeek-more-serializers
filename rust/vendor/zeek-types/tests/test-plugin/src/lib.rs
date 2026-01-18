@@ -87,7 +87,7 @@ fn check_round_trip() {
 }
 
 fn vector() {
-    let ty: cxx::UniquePtr<_> = Type::Vec(Some(Box::new(Type::Count))).try_into().unwrap();
+    let ty: cxx::UniquePtr<_> = Type::Vec(Box::new(Type::Count)).try_into().unwrap();
     assert_eq!(ty.val().unwrap().Tag(), TypeTag::TYPE_VECTOR);
 
     let val = Val::Vec(vec![Val::Count(42)]);

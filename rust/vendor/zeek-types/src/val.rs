@@ -729,27 +729,15 @@ mod proptest_tools {
                 .boxed(),
             Type::Vec(xs) => {
                 let num_elements = 0..10;
-                match xs {
-                    // `vector of any`.
-                    None => {
-                        let any_val = prop_oneof![
-                            any::<Type>().prop_flat_map(arbitrary_val),
-                            Just(Val::None), // Holes.
-                        ];
-                        prop::collection::vec(any_val, num_elements)
-                            .prop_map(Val::Vec)
-                            .boxed()
-                    }
-                    Some(ty) => prop::collection::vec(
-                        prop_oneof![
-                            arbitrary_val(*ty),
-                            Just(Val::None), // Holes.
-                        ],
-                        num_elements,
-                    )
-                    .prop_map(Val::Vec)
-                    .boxed(),
-                }
+                prop::collection::vec(
+                    prop_oneof![
+                        arbitrary_val(*xs),
+                        Just(Val::None), // Holes.
+                    ],
+                    num_elements,
+                )
+                .prop_map(Val::Vec)
+                .boxed()
             }
             Type::List(xs) => {
                 let num_elements = 0..10;

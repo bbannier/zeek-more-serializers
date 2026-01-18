@@ -56,7 +56,7 @@ mod proptest_tools {
         Interval,
         Time,
         Pattern,
-        Vec(Option<Box<Type<'a>>>),
+        Vec(Box<Type<'a>>),
         List(Option<Box<Type<'a>>>),
         Set(SetType<'a>),
         Table(TableType<'a>),
@@ -113,7 +113,7 @@ mod proptest_tools {
                 Type::Interval => Type::Interval,
                 Type::Time => Type::Time,
                 Type::Pattern => Type::Pattern,
-                Type::Vec(xs) => Type::Vec(xs.map(|x| Box::new((*x).into_owned()))),
+                Type::Vec(xs) => Type::Vec(Box::new(xs.into_owned())),
                 Type::List(xs) => Type::List(xs.map(|x| Box::new((*x).into_owned()))),
                 Type::Set(xs) => Type::Set(xs.into_owned()),
                 Type::Table(xs) => Type::Table(xs.into_owned()),
@@ -145,12 +145,8 @@ mod proptest_tools {
                 }
 
                 Type::Vec(x) => {
-                    let inner = x.map_or_else(
-                        // We can encode unknown vector yield type as `TYPE_ANY`.
-                        || Ok(ffi::to_owned_type(zeek::base_type(zeek::TypeTag::TYPE_ANY))),
-                        |x| (*x).try_into(),
-                    )?;
-                    ffi::make_vector_type(&inner)
+                    let x: cxx::UniquePtr<_> = (*x).try_into()?;
+                    ffi::make_vector_type(&x)
                 }
 
                 Type::List(x) => {
@@ -292,9 +288,8 @@ mod proptest_tools {
                 //         Some(Type::Table(tt))
                 //     })
                 // }),
-                // TODO(bbannier): Test `vector of any`, i.e., the `None` variant here.
                 leaf.clone()
-                    .prop_map(|inner| { Type::Vec(Some(Box::new(inner))) }),
+                    .prop_map(|inner| { Type::Vec(Box::new(inner)) }),
             ]
             .boxed()
         }
