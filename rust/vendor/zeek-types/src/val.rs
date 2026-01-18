@@ -684,7 +684,7 @@ mod proptest_tools {
                 .boxed(),
             Type::Port => (any::<u16>(), any::<TransportProto>())
                 .prop_map(|(num, proto)| Val::Port {
-                    num: num.into(), // FIXME(bbannier): constrain this on the type level.
+                    num: num.into(),
                     proto,
                 })
                 .boxed(),
