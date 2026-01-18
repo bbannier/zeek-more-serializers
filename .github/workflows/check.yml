@@ -27,7 +27,6 @@ jobs:
       - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670
         with:
           channel: stable
-          bins: cargo-hack
           components: clippy,rustfmt
           target-dirs: build/cargo/build,rust-target
       - uses: actions/setup-python@v6
@@ -97,7 +96,8 @@ jobs:
       - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670
         with:
           channel: stable
+          bins: cargo-hack
           target-dirs: build/cargo/build,rust-target
       - name: Test
         run: |
-          cargo t --workspace --manifest-path rust/Cargo.toml
+          cargo hack t --feature-powerset --workspace --manifest-path rust/Cargo.toml
