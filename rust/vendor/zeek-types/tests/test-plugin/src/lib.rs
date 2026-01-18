@@ -7,7 +7,7 @@ use proptest::{
     test_runner::{Config, TestRunner},
 };
 use zeek_types::{
-    Error, IpNetwork, Val, arbitrary_val,
+    Error, IpNetwork, Subnet, Val, arbitrary_val,
     support::PluginWrapper,
     types::{SetType, Type},
     zeek::TypeTag,
@@ -100,9 +100,12 @@ fn vector() {
 fn subnet() {
     let ty: cxx::UniquePtr<_> = Type::Set(SetType(vec![Type::Subnet])).try_into().unwrap();
 
-    let i = vec![Val::Subnet(IpNetwork::from_str("::/1").unwrap())].into_boxed_slice();
+    let i = vec![Val::Subnet(Subnet::new(
+        IpNetwork::from_str("::/1").unwrap(),
+    ))]
+    .into_boxed_slice();
 
-    let val = Val::Set(vec![i]);
+    let val = Val::Set([i].into_iter().collect());
     let x0 = val.clone().to_valptr(Some(&ty)).unwrap();
     let x1: Val = x0.val().unwrap().try_into().unwrap();
     assert_eq!(val, x1);

@@ -18,7 +18,12 @@ use std::{
     pin::Pin,
 };
 
-pub use crate::{error::Error, event::Event, val::Val, zval::TypedZVal};
+pub use crate::{
+    error::Error,
+    event::Event,
+    val::{Addr, Subnet, Val},
+    zval::TypedZVal,
+};
 pub use ipnetwork::{IpNetwork, Ipv4Network, Ipv6Network};
 
 type Result<T> = std::result::Result<T, Error>;
@@ -421,7 +426,7 @@ mod ffi {
 
 /// Safe Rust type mapping Zeek's `zeek::TransportProto`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum TransportProto {
     Unknown,
     Tcp,
