@@ -1,10 +1,14 @@
 use crate::{UniquePtr, wrap_unsafe, zeek};
 use core::slice;
-use derivative::Derivative;
 use ipnetwork::IpNetwork;
 use num_traits::cast::FromPrimitive;
+use ordered_float::OrderedFloat;
 
-use std::{borrow::Cow, collections::BTreeMap, net::IpAddr};
+use std::{
+    borrow::Cow,
+    collections::{BTreeMap, BTreeSet},
+    net::IpAddr,
+};
 
 use time::{Duration, OffsetDateTime};
 
@@ -53,7 +57,7 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
         TypeTag::TYPE_BOOL => Self::Bool(val.as_bool()),
         TypeTag::TYPE_INT => Self::Int(val.as_int()),
         TypeTag::TYPE_COUNT => Self::Count(val.as_count()),
-        TypeTag::TYPE_DOUBLE => Self::Double(val.as_double()),
+        TypeTag::TYPE_DOUBLE => Self::Double(val.as_double().into()),
         TypeTag::TYPE_STRING => {
             let s = val.as_string_val().ok_or(Error::ValueUnset)?;
             let len = usize::try_from(s.Len()).map_err(Error::IntegerConversion)?;
@@ -73,13 +77,13 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
         }
         TypeTag::TYPE_ADDR => {
             let addr = val.as_addr_val().ok_or(Error::ValueUnset)?;
-            Self::Addr(addr.try_into()?)
+            Self::Addr(Addr::new(addr.try_into()?))
         }
         TypeTag::TYPE_SUBNET => {
             let sub = val.as_subnet_val().ok_or(Error::ValueUnset)?;
             let sub = ffi::Subnet::from(sub);
             let network = IpNetwork::new(sub.prefix.try_into()?, sub.width.try_into()?)?;
-            Self::Subnet(network)
+            Self::Subnet(Subnet::new(network))
         }
         TypeTag::TYPE_INTERVAL => {
             let secs = val.as_interval();
@@ -148,7 +152,7 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
                 let xs = xs.into_iter().map(|(k, _)| k).collect();
                 Val::Set(xs)
             } else {
-                Val::Table(xs?)
+                Val::Table(xs?.into_iter().collect())
             }
         }
 
@@ -200,34 +204,39 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
 }
 
 /// Rust wrapper around `zeek::Val`.
-#[allow(clippy::unsafe_derive_deserialize)] // Fires incorrectly, FP.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[derive(Derivative)]
-#[derivative(PartialEq)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub enum Val<'a> {
     None,
     Bool(bool),
     Count(u64),
     Int(i64),
-    Double(f64),
+    Double(OrderedFloat<f64>),
     Enum(TypeId<'a>, u64),
     String(Cow<'a, [u8]>),
     Port {
         num: u32,
         proto: TransportProto,
     },
-    // Use custom comparison function for special handling of mapped IPv6 addresses.
-    Addr(#[derivative(PartialEq(compare_with = "compare_ipaddr"))] IpAddr),
-    // Use custom comparison function since `IpNetwork` by default compares for bit equality, but
+    // Use custom type for special handling of mapped IPv6 addresses.
+    Addr(Addr),
+    // Use custom type since `IpNetwork` by default compares for bit equality, but
     // we want equivalence.
-    Subnet(#[derivative(PartialEq(compare_with = "compare_ipnetwork"))] IpNetwork),
+    Subnet(Subnet),
     Interval(Duration),
     Time(OffsetDateTime),
     Vec(Vec<Val<'a>>),
     List(Box<[Val<'a>]>),
-    Set(#[derivative(PartialEq(compare_with = "compare_set"))] Vec<Box<[Val<'a>]>>),
-    Table(Vec<(Box<[Val<'a>]>, Val<'a>)>),
+    Set(BTreeSet<Box<[Val<'a>]>>),
+    // Serialize tables as vectors since formats like JSON do not support multiple keys.
+    Table(
+        // #[cfg_attr(feature = "serde", serde_as(as = "Vec<(_, _)>"))]
+        #[cfg_attr(
+            feature = "serde",
+            serde(with = "serde_with::As::<Vec<(serde_with::Same, serde_with::Same)>>")
+        )]
+        BTreeMap<Box<[Val<'a>]>, Val<'a>>,
+    ),
     Pattern {
         exact: Cow<'a, str>,
         anywhere: Cow<'a, str>,
@@ -295,7 +304,7 @@ impl Val<'_> {
             }
             Val::Double(x) => {
                 check_dest_type!(TypeTag::TYPE_DOUBLE);
-                ffi::make_double(x)
+                ffi::make_double(*x)
             }
             Val::String(x) => {
                 check_dest_type!(TypeTag::TYPE_STRING);
@@ -584,29 +593,6 @@ impl<'a> TryFrom<&'a ffi::ListVal> for Box<[Val<'a>]> {
     }
 }
 
-fn compare_set<'a>(l: &Vec<Box<[Val<'a>]>>, r: &Vec<Box<[Val<'a>]>>) -> bool {
-    // Slightly funky: two sets are equal if all elements in one are contained
-    // in the other. This deals with our vecs which permit duplicates.
-    //
-    // TODO(bbannier): Somehow enforce uniqueness on the type level.
-    l.iter().all(|l| r.contains(l)) && r.iter().all(|r| l.contains(r))
-}
-
-fn compare_ipnetwork(a: &IpNetwork, b: &IpNetwork) -> bool {
-    compare_ipaddr(&a.network(), &b.network()) && a.prefix() == b.prefix()
-}
-
-fn compare_ipaddr(a: &IpAddr, b: &IpAddr) -> bool {
-    fn make_canonical(addr: IpAddr) -> IpAddr {
-        match addr {
-            IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),
-            v4 @ IpAddr::V4(..) => v4,
-        }
-    }
-
-    make_canonical(*a) == make_canonical(*b)
-}
-
 impl ValInterface for ffi::Val {
     wrap_unsafe!(as_string_val, AsStringVal, ffi::StringVal);
     wrap_unsafe!(as_port_val, AsPortVal, ffi::PortVal);
@@ -663,8 +649,68 @@ impl ValInterface for ffi::Val {
     }
 }
 
+/// An `IpAddr` with Zeek semantics.
+///
+/// Zeek implicitly converts IPv6-mapped IPv4 addresses to IPv4. This type does this automatically.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Addr(IpAddr);
+
+impl Addr {
+    #[must_use]
+    pub fn new(addr: IpAddr) -> Self {
+        let addr = match addr {
+            IpAddr::V6(v6) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),
+            v4 @ IpAddr::V4(..) => v4,
+        };
+
+        Self(addr)
+    }
+
+    #[must_use]
+    pub fn addr(&self) -> IpAddr {
+        self.0
+    }
+}
+
+impl std::fmt::Display for Addr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+/// An `IpNetwork` with Zeek semantics.
+///
+/// In contrast to `IpNetwork` Zeek's subnet implicitly truncates to the network part of the
+/// address. Zeek also converts IPv6-mapped IPv4 addresses in the network part to IPv4. This type
+/// does this automatically.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct Subnet(IpNetwork);
+
+impl Subnet {
+    #[must_use]
+    #[allow(clippy::missing_panics_doc)]
+    pub fn new(network: IpNetwork) -> Self {
+        let addr = Addr::new(network.network());
+        Self(IpNetwork::new(addr.addr(), network.prefix()).expect("network should be valid"))
+    }
+
+    #[must_use]
+    pub fn network(&self) -> IpAddr {
+        self.0.network()
+    }
+
+    #[must_use]
+    pub fn prefix(&self) -> u8 {
+        self.0.prefix()
+    }
+}
+
 #[cfg(feature = "proptest")]
 mod proptest_tools {
+    use crate::types::{SetType, TableType};
+    use crate::val::{Addr, Subnet};
     use crate::{TransportProto, Val, types::Type};
     use ipnetwork::IpNetwork;
     use ipnetwork::{Ipv4Network, Ipv6Network};
@@ -678,7 +724,12 @@ mod proptest_tools {
             Type::Bool => any::<bool>().prop_map(Val::Bool).boxed(),
             Type::Count => any::<u64>().prop_map(Val::Count).boxed(),
             Type::Int => any::<i64>().prop_map(Val::Int).boxed(),
-            Type::Double => any::<f64>().prop_map(Val::Double).boxed(),
+            Type::Double => {
+                // Only generate powers of 2 so we have a higher change of values roundtripping.
+                (-1022..=1023i32)
+                    .prop_map(|exp| Val::Double(2.0_f64.powi(exp).into()))
+                    .boxed()
+            }
             Type::String => prop::collection::vec(any::<u8>(), 0..16)
                 .prop_map(|x| Val::String(x.into()))
                 .boxed(),
@@ -688,18 +739,20 @@ mod proptest_tools {
                     proto,
                 })
                 .boxed(),
-            Type::Addr => any::<IpAddr>().prop_map(Val::Addr).boxed(),
+            Type::Addr => any::<IpAddr>()
+                .prop_map(|x| Val::Addr(Addr::new(x)))
+                .boxed(),
             Type::Subnet => prop_oneof![
                 (any::<Ipv4Addr>(), 0..=32u8)
                     .prop_filter_map("invalid ipv4 address", |(addr, prefix)| Some(Val::Subnet(
-                        IpNetwork::V4(Ipv4Network::new(addr, prefix).ok()?,)
+                        Subnet::new(IpNetwork::V4(Ipv4Network::new(addr, prefix).ok()?))
                     )))
                     .boxed(),
                 (any::<Ipv6Addr>(), 0..=32u8).prop_filter_map(
                     "invalid ipv6 address",
-                    |(addr, prefix)| Some(Val::Subnet(IpNetwork::V6(
+                    |(addr, prefix)| Some(Val::Subnet(Subnet::new(IpNetwork::V6(
                         Ipv6Network::new(addr, prefix).ok()?
-                    )))
+                    ))))
                 )
             ]
             .boxed(),
@@ -758,19 +811,28 @@ mod proptest_tools {
                         .boxed(),
                 }
             }
-            Type::Set(tys) => {
+            Type::Set(SetType(tys)) => {
                 let elems = tys
-                    .0
                     .into_iter()
                     .map(arbitrary_val)
                     .collect::<Vec<_>>()
                     .prop_map(Vec::into_boxed_slice);
-                prop::collection::vec(elems, 1..4)
+                prop::collection::btree_set(elems, 1..4)
                     .prop_map(Val::Set)
                     .boxed()
             }
-            Type::Table(..) => {
-                todo!()
+            Type::Table(TableType(key, value)) => {
+                let key = key
+                    .into_iter()
+                    .map(arbitrary_val)
+                    .collect::<Vec<_>>()
+                    .prop_map(Vec::into_boxed_slice);
+
+                let value = value.map_or(Just(Val::None).boxed(), |v| arbitrary_val(*v));
+
+                prop::collection::btree_map(key, value, 1..4)
+                    .prop_map(Val::Table)
+                    .boxed()
             }
             Type::Enum(id) => {
                 let id = id.into_owned();

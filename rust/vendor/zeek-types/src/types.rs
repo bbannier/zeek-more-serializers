@@ -276,18 +276,17 @@ mod proptest_tools {
                             .prop_map(SetType)
                             .prop_map(Type::Set)
                     }),
-                // TODO(bbannier): implement generating table values in `arbitrary_val`.
-                // leaf.clone().prop_recursive(4, 4, 8, |inner| {
-                //     let key = prop::collection::vec(inner.clone(), 1..4usize);
-                //     let value = prop::option::weighted(0.8, inner.prop_map(Box::new));
+                leaf.clone().prop_recursive(4, 4, 8, |inner| {
+                    let key = prop::collection::vec(inner.clone(), 1..4usize);
+                    let value = prop::option::weighted(0.8, inner.prop_map(Box::new));
 
-                //     // Always generated typed table types.
-                //     (key, value).prop_filter_map("table of any is unsupported", |(k, v)| {
-                //         let v = v?;
-                //         let tt = TableType(k, Some(v));
-                //         Some(Type::Table(tt))
-                //     })
-                // }),
+                    // Always generated typed table types.
+                    (key, value).prop_filter_map("table of any is unsupported", |(k, v)| {
+                        let v = v?;
+                        let tt = TableType(k, Some(v));
+                        Some(Type::Table(tt))
+                    })
+                }),
                 leaf.clone()
                     .prop_map(|inner| { Type::Vec(Box::new(inner)) }),
             ]
@@ -369,7 +368,7 @@ mod proptest_tools {
 
     impl PartialEq<TableType<'_>> for SetType<'_> {
         fn eq(&self, other: &TableType<'_>) -> bool {
-            return other == self;
+            other == self
         }
     }
 }
