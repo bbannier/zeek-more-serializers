@@ -771,7 +771,8 @@ mod proptest_tools {
                     })
                     .boxed()
             }
-            Type::Pattern => prop::collection::vec("[a-zA-Z]", 0..32)
+            // TODO(bbannier): Enforce non-zero size on type system.
+            Type::Pattern => prop::collection::vec("[a-zA-Z]", 1..32)
                 .prop_map(|v| v.into_iter().collect::<String>())
                 .prop_map(|pat| Val::Pattern {
                     // We use the same pattern here to keep things consistent.
