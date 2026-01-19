@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.15.0 FATAL_ERROR)
 
+find_program(ZEEK_CONFIG zeek-config REQUIRED)
+
 execute_process(
-  COMMAND zeek-config --cmake_dir
+  COMMAND ${ZEEK_CONFIG} --cmake_dir
   OUTPUT_STRIP_TRAILING_WHITESPACE
   OUTPUT_VARIABLE zeek_cmake_dir
   COMMAND_ERROR_IS_FATAL ANY)
