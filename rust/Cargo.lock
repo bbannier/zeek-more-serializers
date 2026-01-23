@@ -1149,7 +1149,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
- "time",
  "zeek-types",
 ]
 
