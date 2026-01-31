@@ -7,7 +7,7 @@ edition = "2024"
 crate-type = ["rlib", "staticlib"]
 
 [dependencies]
-cxx = { version = "1.0.192", features = ["c++20"] }
+cxx = { version = "1.0.194", features = ["c++20"] }
 derivative = "2.2.0"
 ipnetwork = { version = "0.21.1", default-features = false, features = ["serde"] }
 num-traits = "0.2.19"
