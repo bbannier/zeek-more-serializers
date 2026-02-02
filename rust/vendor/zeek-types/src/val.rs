@@ -16,7 +16,6 @@ use crate::{Error, Result, TransportProto, ffi, types::TypeId};
 
 /// Trait so we code can work with both `ffi::Val` and `ffi::ZVal`.
 pub trait ValInterface {
-    #![allow(non_snake_case)]
     fn as_bool(&self) -> bool;
     fn as_int(&self) -> i64;
     fn as_count(&self) -> u64;
