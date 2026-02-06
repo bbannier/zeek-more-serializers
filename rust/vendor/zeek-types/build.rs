@@ -49,7 +49,7 @@ fn zeek_config(flag: &str) -> Result<String, String> {
     let output = Command::new("zeek-config")
         .arg(flag)
         .output()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("zeek-config not found in PATH: {e}"))?;
 
     String::from_utf8(output.stdout).map_err(|e| e.to_string())
 }
