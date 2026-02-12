@@ -85,16 +85,13 @@ enum Error {
     Conversion(#[from] zeek_types::Error),
 
     #[error(transparent)]
-    Encode(#[from] bincode::error::EncodeError),
+    Postcard(#[from] postcard::Error),
 
     #[error(transparent)]
-    Decode(#[from] bincode::error::DecodeError),
+    Io(#[from] std::io::Error),
 
     #[error(transparent)]
     Json(#[from] serde_json::Error),
-
-    #[error("deserialization left {0} bytes unconsumed")]
-    UnconsumedBytes(usize),
 
     #[error("unsupported format {0:?}")]
     UnsupportedFormat(ffi::Format),

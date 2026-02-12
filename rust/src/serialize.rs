@@ -1,5 +1,6 @@
 use std::io::{BufWriter, Write};
 
+use postcard::ser_flavors::{self};
 use zeek_types::zeek;
 
 use crate::{Error, Result, ffi::Format};
@@ -29,23 +30,18 @@ trait SerializerEngine {
 }
 
 impl SerializerEngine for Binary {
-    fn serialize<T, B>(val: &T, mut buf: B) -> Result<()>
+    fn serialize<T, B>(val: &T, buf: B) -> Result<()>
     where
         T: serde::Serialize,
         B: Write,
     {
-        bincode::serde::encode_into_std_write(val, &mut buf, bincode::config::standard())?;
+        let w = ser_flavors::io::WriteFlavor::new(buf);
+        postcard::serialize_with_flavor(val, w)?;
         Ok(())
     }
 
     fn deserialize<'de, T: serde::Deserialize<'de>>(buf: &'de [u8]) -> Result<T> {
-        let (value, read) =
-            bincode::serde::borrow_decode_from_slice(buf, bincode::config::standard())?;
-
-        if read < buf.len() {
-            return Err(Error::UnconsumedBytes(buf.len() - read));
-        }
-
+        let value = postcard::from_bytes(buf)?;
         Ok(value)
     }
 }
