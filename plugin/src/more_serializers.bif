@@ -78,17 +78,17 @@ function deserialize_val%(val: string, ty: any, format: Format%): any
 
 module Zeek::more_serializers::detail;
 
-function bench_storage%(val: any%): any
+function bench_storage%(suite: string, val: any%): any
 %{
     assert(val);
-    Zeek_more_serializers::detail::benchmark::bench_storage(*val);
+    Zeek_more_serializers::detail::benchmark::bench_storage(suite, *val);
     return {};
 %}
 
-function bench_event%(topic: string, ...%): any
+function bench_event%(suite: string, topic: string, ...%): any
 %{
-    auto args = zeek::ArgsSpan{*@ARGS@}.subspan(1);
+    auto args = zeek::ArgsSpan{*@ARGS@}.subspan(2);
     // assert(val);
-    Zeek_more_serializers::detail::benchmark::bench_event({zeek::NewRef{}, topic}, args);
+    Zeek_more_serializers::detail::benchmark::bench_event(suite, {zeek::NewRef{}, topic}, args);
     return {};
 %}

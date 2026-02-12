@@ -7,42 +7,35 @@
 event zeek_init()
 	{
 	local b: bool = T;
-	print type_name(b);
-	Zeek::more_serializers::detail::bench_storage(b);
+	Zeek::more_serializers::detail::bench_storage(type_name(b), b);
 
 	print "##########################################";
 
 	local c: count = 1123123123;
-	print type_name(c);
-	Zeek::more_serializers::detail::bench_storage(c);
+	Zeek::more_serializers::detail::bench_storage(type_name(c), c);
 
 	print "##########################################";
 
 	local str: string = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-	print type_name(str);
-	Zeek::more_serializers::detail::bench_storage(str);
+	Zeek::more_serializers::detail::bench_storage(type_name(str), str);
 
 	print "##########################################";
 
 	local v = vector(1, 2, 2, 3, 4, 5, 1, 12, 12, 12);
-	print type_name(v);
-	Zeek::more_serializers::detail::bench_storage(v);
+	Zeek::more_serializers::detail::bench_storage(type_name(v), v);
 
 	print "##########################################";
 
 	local s = set(1, 2, 2, 3, 4, 5, 1, 12, 12, 12);
-	print type_name(s);
-	Zeek::more_serializers::detail::bench_storage(s);
+	Zeek::more_serializers::detail::bench_storage(type_name(s), s);
 	print "##########################################";
 
 	local r = SumStats::SumStat($name="foo", $epoch=42sec, $reducers=set());
-	print type_name(r);
-	Zeek::more_serializers::detail::bench_storage(r);
+	Zeek::more_serializers::detail::bench_storage(type_name(r), r);
 	print "##########################################";
 
 	local x: count = 1123123123;
-	print type_name(x);
-	Zeek::more_serializers::detail::bench_storage(x);
+	Zeek::more_serializers::detail::bench_storage(type_name(x) ,x);
 	print "##########################################";
 	}
 
@@ -57,27 +50,22 @@ event zeek_init()
 	local evt: Cluster::Event;
 
 	evt = Cluster::make_event(ping_empty);
-	print "ping_empty";
-	Zeek::more_serializers::detail::bench_event("topic", evt);
+	Zeek::more_serializers::detail::bench_event("ping_empty", "topic", evt);
 	print "##########################################";
 
 	evt = Cluster::make_event(ping_string, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-	print "ping_string";
-	Zeek::more_serializers::detail::bench_event("topic", evt);
+	Zeek::more_serializers::detail::bench_event("ping_string", "topic", evt);
 	print "##########################################";
 
 	evt = Cluster::make_event(ping_sumstat, SumStats::SumStat($name="foo", $epoch=42sec, $reducers=set()));
-	print "ping_sumstat";
-	Zeek::more_serializers::detail::bench_event("topic", evt);
+	Zeek::more_serializers::detail::bench_event("ping_sumstat", "topic", evt);
 	print "##########################################";
 
 	evt = Cluster::make_event(ping_set, set(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
-	print "ping_set";
-	Zeek::more_serializers::detail::bench_event("topic", evt);
+	Zeek::more_serializers::detail::bench_event("ping_set", "topic", evt);
 	print "##########################################";
 
 	evt = Cluster::make_event(ping_vector, vector(0, 1, 2, 3, 4, 5, 6, 7, 8, 9));
-	print "ping_vector";
-	Zeek::more_serializers::detail::bench_event("topic", evt);
+	Zeek::more_serializers::detail::bench_event("ping_vector", "topic", evt);
 	print "##########################################";
 	}

@@ -9,6 +9,7 @@
 #include <memory>
 #include <numeric>
 #include <optional>
+#include <ranges>
 #include <unordered_map>
 #include <vector>
 #include <zeek/IntrusivePtr.h>
@@ -184,19 +185,50 @@ Duration mean(const Measurements &xs) {
   return std::accumulate(xs.begin(), xs.end(), Duration()) / n;
 }
 
-void summarize(const Timinig &t_serialize, const Timinig &t_deserialize) {
-  std::cout << "#name t_serialize t_deserialize n\n";
-  for (auto &&[name, dt] : t_serialize) {
-    auto n = dt.size();
-    auto mean_serialize = mean(dt);
+Duration mean_err(const Measurements &xs, const Duration &mean) {
+  auto n = xs.size();
 
-    auto &de = t_deserialize.at(name);
-    assert(de.size() == n);
-    auto mean_deserialize = mean(de);
+  auto v =
+      xs | std::views::transform([&](const std::chrono::duration<double> &x) {
+        return std::pow((x - mean).count(), 2);
+      });
+  return Duration{std::sqrt(std::accumulate(v.begin(), v.end(), 0.))};
+}
 
-    std::cout << name << ' ' << mean_serialize << ' ' << mean_deserialize << ' '
-              << n << '\n';
+void summarize(std::string_view suite, const Timinig &t_serialize,
+               const Timinig &t_deserialize) {
+
+  for (auto &&[name, xs] : t_serialize) {
+    auto bench = "ser";
+    for (auto &&x : xs)
+      std::cout << std::format("{}\t{}\t{}\t{}\n", bench, suite, name,
+                               x.count());
   }
+
+  for (auto &&[name, xs] : t_deserialize) {
+    auto bench = "de";
+    for (auto &&x : xs)
+      std::cout << std::format("{}\t{}\t{}\t{}\n", bench, suite, name,
+                               x.count());
+  }
+
+  // std::cout << "#suite name n t_serialize dt_serialize t_deserialize "
+  //              "dt_deserialize\n";
+
+  // for (auto &&[name, dt] : t_serialize) {
+  //   auto n = dt.size();
+  //   auto mean_serialize = mean(dt);
+  //   auto sig_serialize = mean_err(dt, mean_serialize);
+
+  //   auto &de = t_deserialize.at(name);
+  //   assert(de.size() == n);
+  //   auto mean_deserialize = mean(de);
+  //   auto sig_deserialize = mean_err(dt, mean_deserialize);
+
+  //   std::cout << suite << '\t' << name << '\t' << n << '\t' << mean_serialize
+  //             << '\t' << sig_serialize << '\t' << mean_deserialize << '\t'
+  //             << sig_deserialize << '\n';
+  // }
 }
 
 size_t benchmark_iterations() {
@@ -213,7 +245,7 @@ size_t benchmark_iterations() {
 
 } // namespace
 
-void bench_storage(const zeek::Val &val_) {
+void bench_storage(zeek::StringVal *suite, const zeek::Val &val_) {
   auto val = const_cast<zeek::Val &>(val_).Clone();
 
   std::unordered_map<std::string, std::unique_ptr<zeek::storage::Serializer>>
@@ -246,10 +278,11 @@ void bench_storage(const zeek::Val &val_) {
     }
   }
 
-  summarize(t_serialize, t_deserialize);
+  summarize(suite->ToStdStringView(), t_serialize, t_deserialize);
 }
 
-void bench_event(const zeek::ValPtr &topic, zeek::ArgsSpan args) {
+void bench_event(zeek::StringVal *suite, const zeek::ValPtr &topic,
+                 zeek::ArgsSpan args) {
   static const auto &cluster_event_type =
       zeek::id::find_type<zeek::RecordType>("Cluster::Event");
 
@@ -303,6 +336,6 @@ void bench_event(const zeek::ValPtr &topic, zeek::ArgsSpan args) {
     }
   }
 
-  summarize(t_serialize, t_deserialize);
+  summarize(suite->ToStdStringView(), t_serialize, t_deserialize);
 }
 } // namespace Zeek_more_serializers::detail::benchmark

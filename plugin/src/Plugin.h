@@ -14,8 +14,9 @@ protected:
 extern Plugin plugin;
 
 namespace detail::benchmark {
-void bench_storage(const zeek::Val &val);
-void bench_event(const zeek::ValPtr &topic, zeek::ArgsSpan args);
+void bench_storage(zeek::StringVal *suite, const zeek::Val &val);
+void bench_event(zeek::StringVal *suite, const zeek::ValPtr &topic,
+                 zeek::ArgsSpan args);
 } // namespace detail::benchmark
 
 } // namespace Zeek_more_serializers
