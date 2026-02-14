@@ -1,6 +1,6 @@
 use std::{env, fs, os, path::PathBuf};
 
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -33,7 +33,7 @@ fn dist_dir() -> Result<()> {
     let dist = scratch::path("dist");
     let dist = dist
         .to_str()
-        .unwrap_or_else(|| panic!("path '{dist:?}' is not valid UTF-8"));
+        .ok_or(anyhow!("path '{dist:?}' is not valid UTF-8"))?;
     println!("{dist}");
 
     Ok(())
@@ -52,12 +52,12 @@ fn dist(package: String) -> Result<()> {
     // Write the marker file.
     let marker = dist.join("__zeek_plugin__");
     let _ = fs::remove_file(&marker);
-    fs::write(&marker, format!("{package}\n")).unwrap();
+    fs::write(&marker, format!("{package}\n"))?;
 
     // Put a link to the library in the expected spot with expected name.
     let lib_dir = dist.join("lib");
     let _ = fs::remove_dir_all(&lib_dir);
-    fs::create_dir(&lib_dir).unwrap();
+    fs::create_dir(&lib_dir)?;
     let mut dir = out_dir.clone();
     while !dir.ends_with("build") {
         dir.pop();
@@ -70,7 +70,7 @@ fn dist(package: String) -> Result<()> {
         format!("lib{}.so", lib_name)
     };
     let dylib = dir.join(dylib);
-    let os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let os = env::var("CARGO_CFG_TARGET_OS")?;
     let os = match os.as_str() {
         "macos" => "darwin",
         "linux" => "linux",
@@ -78,7 +78,7 @@ fn dist(package: String) -> Result<()> {
             panic!("unsupported target OS '{os}'");
         }
     };
-    let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    let arch = env::var("CARGO_CFG_TARGET_ARCH")?;
     let arch = match arch.as_str() {
         "aarch64" => {
             if os == "darwin" {
@@ -94,7 +94,7 @@ fn dist(package: String) -> Result<()> {
     };
     let new_name = lib_dir.join(format!("lib{lib_name}.{os}-{arch}.so"));
 
-    os::unix::fs::symlink(dylib, &new_name).unwrap();
+    os::unix::fs::symlink(dylib, &new_name)?;
 
     Ok(())
 }
