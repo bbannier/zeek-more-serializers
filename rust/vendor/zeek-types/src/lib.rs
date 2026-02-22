@@ -42,7 +42,7 @@ pub mod zeek {
     }
 
     pub mod detail {
-        pub use crate::ffi::MetadataEntry;
+        pub use crate::ffi::{Frame, MetadataEntry};
     }
 
     pub mod id {
@@ -264,6 +264,11 @@ mod ffi {
         fn Val(self: &MetadataEntry) -> &ValPtr;
     }
 
+    #[namespace = "::zeek::detail"]
+    unsafe extern "C++" {
+        type Frame;
+    }
+
     #[namespace = "::zeek::plugin"]
     unsafe extern "C++" {
         include!("zeek/plugin/Plugin.h");
@@ -282,6 +287,12 @@ mod ffi {
         #[must_use]
         fn make(name: &str, description: &str) -> UniquePtr<PluginWrapper>;
         fn with_init_pre_execution(self: Pin<&mut PluginWrapper>, hook: fn());
+
+        fn add_bif_item_function(
+            self: Pin<&mut PluginWrapper>,
+            name: &str,
+            callback: fn(frame: Pin<&mut Frame>, args: &Args) -> UniquePtr<ValPtr>,
+        );
     }
 
     unsafe extern "C++" {

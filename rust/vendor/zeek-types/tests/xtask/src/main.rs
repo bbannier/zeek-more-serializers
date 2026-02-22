@@ -1,4 +1,10 @@
-use std::{env, fs, os, path::PathBuf};
+use std::{
+    env,
+    fs::{self, read_to_string},
+    io::Write,
+    os,
+    path::PathBuf,
+};
 
 use anyhow::{Result, anyhow};
 use clap::{Parser, Subcommand};
@@ -17,7 +23,10 @@ enum Command {
     Dist {
         /// Name of the crate to package.
         plugin: String,
-        output: Option<PathBuf>,
+
+        /// Zeek scripts to include in the plugin's '__load__.zeek'.
+        #[arg(short, long)]
+        defs: Vec<PathBuf>,
     },
 }
 
@@ -25,7 +34,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     match args.command {
         Command::DistDir => dist_dir(),
-        Command::Dist { plugin, .. } => dist(plugin),
+        Command::Dist { plugin, defs } => dist(plugin, defs),
     }
 }
 
@@ -39,7 +48,7 @@ fn dist_dir() -> Result<()> {
     Ok(())
 }
 
-fn dist(package: String) -> Result<()> {
+fn dist(package: String, defs: Vec<PathBuf>) -> Result<()> {
     // Build the package.
     std::process::Command::new("cargo")
         .args(["build", "--package", &package])
@@ -95,6 +104,21 @@ fn dist(package: String) -> Result<()> {
     let new_name = lib_dir.join(format!("lib{lib_name}.{os}-{arch}.so"));
 
     os::unix::fs::symlink(dylib, &new_name)?;
+
+    // If needed, generate a `__load__.zeek`.
+    // FIXME(bbannier): These files should be created automatically, e.g., from a proc macro and
+    // just be collected here without having to be passed explicitly.
+    if !defs.is_empty() {
+        let bif_dir = lib_dir.join("bif");
+        fs::create_dir(&bif_dir)?;
+
+        let mut load = fs::File::create_new(bif_dir.join("__load__.zeek"))?;
+
+        for f in defs {
+            let contents = read_to_string(f)?;
+            load.write_all(contents.as_bytes())?;
+        }
+    }
 
     Ok(())
 }

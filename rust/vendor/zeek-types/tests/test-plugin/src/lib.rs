@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::LazyLock};
+use std::{pin::Pin, str::FromStr, sync::LazyLock};
 
 use ctor::ctor;
 use cxx::UniquePtr;
@@ -10,6 +10,7 @@ use zeek_types::{
     Error, IpNetwork, Subnet, Val, arbitrary_val,
     support::PluginWrapper,
     types::{SetType, Type},
+    zeek,
     zeek::TypeTag,
 };
 
@@ -32,9 +33,37 @@ impl TestPlugin {
     fn new() -> Self {
         let mut plugin = PluginWrapper::new(env!("CARGO_PKG_NAME"), "plugin for testing");
         plugin.pin_mut().with_init_pre_execution(Self::run_tests);
+        plugin.pin_mut().add_bif_item_function("::sum", sum_bif);
 
         Self(plugin)
     }
+}
+
+fn sum(a: u64, b: u64) -> u64 {
+    a + b
+}
+
+// FIXME(bbannier): Ideally this would be generated from a macro.
+fn sum_bif(_frame: Pin<&mut zeek::detail::Frame>, args: &zeek::Args) -> UniquePtr<zeek::ValPtr> {
+    assert_eq!(args.size(), 2, "unexpected number of arguments");
+
+    let Some(a) = args.at(0).val().and_then(|x| Val::try_from(x).ok()) else {
+        return UniquePtr::null();
+    };
+    let Ok(a) = a.try_into() else {
+        return UniquePtr::null();
+    };
+
+    let Some(b) = args.at(1).val().and_then(|x| Val::try_from(x).ok()) else {
+        return UniquePtr::null();
+    };
+    let Ok(b) = b.try_into() else {
+        return UniquePtr::null();
+    };
+
+    Val::from(sum(a, b))
+        .to_valptr(None)
+        .unwrap_or_else(|_| UniquePtr::null())
 }
 
 fn check_round_trip() {

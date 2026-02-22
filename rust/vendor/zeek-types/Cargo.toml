@@ -5,6 +5,7 @@ edition = "2024"
 
 [lib]
 crate-type = ["rlib", "staticlib"]
+test = false
 
 [dependencies]
 cxx = { version = "1.0.194", features = ["c++20"] }

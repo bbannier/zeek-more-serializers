@@ -1,6 +1,4 @@
-#[cfg_attr(not(target_os = "macos"), allow(unused_imports))]
-use cargo_emit::rerun_if_changed;
-use cargo_emit::rerun_if_env_changed;
+use cargo_emit::{rerun_if_changed, rerun_if_env_changed};
 use std::process::Command;
 
 fn main() -> Result<(), String> {

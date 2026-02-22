@@ -1,13 +1,22 @@
 #[cfg(test)]
 mod tests {
     use std::{
-        env,
+        env::{self},
+        path::PathBuf,
         process::{Command, Stdio},
     };
 
     #[test]
     fn plugin_tests() {
-        xtask(&["dist", "test-plugin"]);
+        // FIXME(bbannier): instead of manually loads they should be generated automatically.
+        let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+        let loads = manifest_dir
+            .parent()
+            .unwrap()
+            .join("test-plugin")
+            .join("run.zeek");
+
+        xtask(&["dist", "test-plugin", "-d", loads.to_str().unwrap()]);
         let dist_dir = xtask(&["dist-dir"]).trim().to_owned();
 
         let proptest_cases = env::var("PROPTEST_CASES").unwrap_or_else(|_| "10000".to_string());
