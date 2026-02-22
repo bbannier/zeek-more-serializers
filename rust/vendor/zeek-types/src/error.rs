@@ -1,4 +1,4 @@
-use std::{num::TryFromIntError, str::Utf8Error};
+use std::{convert::Infallible, num::TryFromIntError, str::Utf8Error};
 
 use derivative::Derivative;
 use ipnetwork::IpNetworkError;
@@ -79,6 +79,9 @@ pub enum Error {
 
     #[error("IP network error: {0}")]
     IpNetworkError(#[from] IpNetworkError),
+
+    #[error("should never happen")]
+    Infallible(#[from] Infallible),
 
     #[error("{0}")]
     CxxException(

@@ -869,3 +869,79 @@ mod proptest_tools {
 
 #[cfg(feature = "proptest")]
 pub use proptest_tools::arbitrary_val;
+
+macro_rules! impl_val_from {
+    ($variant:path, $ty:ty, $a:lifetime) => {
+        impl<$a> From<$ty> for Val<$a> {
+            fn from(value: $ty) -> Self {
+                $variant(value.into())
+            }
+        }
+    };
+}
+
+macro_rules! impl_val_try_into {
+    ($variant:path, $ty:ty, $a:lifetime) => {
+        impl<$a> TryInto<$ty> for Val<$a> {
+            type Error = Error;
+
+            fn try_into(self) -> std::result::Result<$ty, Self::Error> {
+                let $variant(x) = self else {
+                    Err(Error::ValueUnset)?
+                };
+                let x = x.try_into()?;
+                Ok(x)
+            }
+        }
+    };
+}
+
+macro_rules! impl_val_conversions {
+    ($variant:path, $ty:ty, $a:lifetime) => {
+        impl_val_from!($variant, $ty, $a);
+        impl_val_try_into!($variant, $ty, $a);
+    };
+}
+
+impl From<()> for Val<'_> {
+    fn from((): ()) -> Self {
+        Val::None
+    }
+}
+
+impl TryInto<()> for Val<'_> {
+    type Error = Error;
+
+    fn try_into(self) -> std::result::Result<(), Self::Error> {
+        if matches!(self, Val::None) {
+            Ok(())
+        } else {
+            Err(Error::ValueUnset)
+        }
+    }
+}
+
+impl_val_conversions!(Val::Bool, bool, 'a);
+
+impl_val_conversions!(Val::Count, u8, 'a);
+impl_val_conversions!(Val::Count, u16, 'a);
+impl_val_conversions!(Val::Count, u32, 'a);
+impl_val_conversions!(Val::Count, u64, 'a);
+
+impl_val_conversions!(Val::Int, i8,'a);
+impl_val_conversions!(Val::Int, i16,'a);
+impl_val_conversions!(Val::Int, i32,'a);
+impl_val_conversions!(Val::Int, i64,'a);
+
+impl_val_conversions!(Val::Double, f64,'a);
+impl_val_conversions!(Val::Double, OrderedFloat<f64>, 'a);
+
+impl_val_conversions!(Val::String, Cow<'a, [u8]>, 'a);
+
+impl_val_conversions!(Val::Addr, Addr, 'a);
+impl_val_conversions!(Val::Subnet, Subnet, 'a);
+impl_val_conversions!(Val::Interval, Duration, 'a);
+impl_val_conversions!(Val::Time, OffsetDateTime,'a);
+impl_val_conversions!(Val::Vec, Vec<Val<'a>>, 'a);
+impl_val_conversions!(Val::Set, BTreeSet<Box<[Val<'a>]>>, 'a);
+impl_val_conversions!(Val::Table, BTreeMap<Box<[Val<'a>]>, Val<'a>>, 'a);
