@@ -202,7 +202,7 @@ impl<'a, T: ValInterface> ValConvert<&'a T> for Val<'a> {
     }
 }
 
-/// Rust wrapper around `zeek::Val`.
+/// Rust type modelling `zeek::Val`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
 pub enum Val<'a> {
@@ -648,7 +648,7 @@ impl ValInterface for ffi::Val {
     }
 }
 
-/// An `IpAddr` with Zeek semantics.
+/// An [`IpAddr`] with Zeek semantics.
 ///
 /// Zeek implicitly converts IPv6-mapped IPv4 addresses to IPv4. This type does this automatically.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -717,6 +717,7 @@ mod proptest_tools {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
     use time::{Duration, OffsetDateTime};
 
+    /// Adaptor to generate arbitrary [`Val`]s of a given [`Type`].
     #[allow(clippy::too_many_lines)]
     pub fn arbitrary_val(ty: crate::types::Type<'static>) -> BoxedStrategy<Val<'static>> {
         match ty {

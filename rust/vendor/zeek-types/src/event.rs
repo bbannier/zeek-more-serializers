@@ -6,6 +6,7 @@ use crate::{
     Error, Result, Val, event_registry_lookup_event_arg_type, event_registry_lookup_metadata, ffi,
 };
 
+/// Rust type modelling `zeek::cluster::Event`.
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Event<'a> {
     pub name: &'a str,

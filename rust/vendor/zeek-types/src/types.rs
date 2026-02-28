@@ -1,3 +1,4 @@
+//! Helpers for capturing Zeek value types.
 use std::borrow::Cow;
 
 /// Identifier of a custom Zeek type.
@@ -294,6 +295,7 @@ mod proptest_tools {
         }
     }
 
+    /// Type of a Zeek `set`.
     #[derive(Debug, Clone, PartialEq, Hash, Eq, PartialOrd, Ord)]
     pub struct SetType<'a>(pub Vec<Type<'a>>);
 
@@ -340,9 +342,11 @@ mod proptest_tools {
         }
     }
 
+    /// Type of a Zeek `table`.
+    ///
+    /// In contrast to table keys which always have a concrete type, table values can be `any` and
+    /// not knowing their type is okay.
     #[derive(Debug, Clone, PartialEq, Hash, Eq, PartialOrd, Ord)]
-    // In contrast to table keys which always have a concrete type, table values can be `any` and not
-    // knowing their type is okay.
     pub struct TableType<'a>(pub Vec<Type<'a>>, pub Option<Box<Type<'a>>>);
 
     impl TableType<'_> {

@@ -1,3 +1,5 @@
+//! Types for working with the Zeek C++ API.
+
 #![allow(dead_code)]
 
 mod error;
@@ -34,7 +36,7 @@ pub mod zeek {
         AddrVal, Args, EnumType, EnumVal, EnumValPtr, EventMetadataDescriptor, ListVal, PatternVal,
         PortVal, RE_Matcher, RecordType, RecordVal, StringVal, SubNetVal, TableType, TableTypePtr,
         TableVal, Type, TypeList, TypeListPtr, TypePtr, TypeTag, Val, ValPtr, VectorType,
-        VectorVal, base_type,
+        VectorVal, ZVal, base_type,
     };
 
     pub mod cluster {
@@ -54,9 +56,10 @@ pub mod zeek {
 pub mod support {
     pub use crate::ByteBufferWriter;
     pub use crate::ffi::{
-        ByteBuffer, PluginWrapper, TableEntry, TableIterator, TypePtrVector, ValPtrVector,
-        event_add_metadata, event_make, event_name, event_registry_lookup_event_arg_type,
-        event_registry_lookup_metadata, val_manager_port, zeek_id_find_type,
+        ByteBuffer, PluginWrapper, TableEntry, TableIterator, TypePtrVector, TypedZVal,
+        ValPtrVector, event_add_metadata, event_make, event_name,
+        event_registry_lookup_event_arg_type, event_registry_lookup_metadata, val_manager_port,
+        zeek_id_find_type,
     };
 }
 
@@ -113,8 +116,7 @@ mod ffi {
         width: isize,
     }
 
-    /// Wrapper around a ZVal and its type since these are
-    /// the only references we can get from vectors.
+    /// Wrapper around a ZVal and its type.
     struct TypedZVal {
         val: *const ZVal,
         type_: *const Type,
@@ -585,6 +587,7 @@ impl From<&ffi::SubNetVal> for ffi::Subnet {
     }
 }
 
+/// Writer abstraction around [`support::ByteBuffer`].
 pub struct ByteBufferWriter<'a> {
     inner: Pin<&'a mut ffi::ByteBuffer>,
 }
