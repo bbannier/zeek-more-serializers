@@ -10,10 +10,9 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Corrosion)
 
-# Rust prefers to produce position-independent code, force it for the whole plugin.
+# Rust prefers to produce position-independent code,
+# force it for the whole plugin.
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-add_subdirectory(vendor/zeek-types)
 
 corrosion_import_crate(
     MANIFEST_PATH Cargo.toml
@@ -36,4 +35,6 @@ set_target_properties(zeek_more_serializers_cxx PROPERTIES
     CXX_EXTENSIONS OFF
 )
 
+# Our cxx code depends on headers from `zeek-types`, express that dependency.
+add_subdirectory(vendor/zeek-types)
 target_link_libraries(zeek_more_serializers_cxx PUBLIC zeek_types_cxx)
