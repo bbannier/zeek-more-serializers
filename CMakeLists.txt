@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.22.0 FATAL_ERROR)
 
 find_program(ZEEK_CONFIG zeek-config REQUIRED)
 
