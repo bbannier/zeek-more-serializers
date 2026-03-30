@@ -24,7 +24,7 @@ jobs:
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670
+      - uses: moonrepo/setup-rust@abb2d32350334249b178c401e5ec5836e0cd88d3
         with:
           channel: stable
           components: clippy,rustfmt
@@ -53,7 +53,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y cmake g++ curl wget libssl-dev libpcap-dev ninja-build
-      - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670
+      - uses: moonrepo/setup-rust@abb2d32350334249b178c401e5ec5836e0cd88d3
         with:
           channel: stable
           target-dirs: build/cargo/build,rust-target
@@ -93,7 +93,7 @@ jobs:
         run: |
           apt-get update
           apt-get install -y curl build-essential
-      - uses: moonrepo/setup-rust@ede6de059f8046a5e236c94046823e2af11ca670
+      - uses: moonrepo/setup-rust@abb2d32350334249b178c401e5ec5836e0cd88d3
         with:
           channel: stable
           bins: cargo-hack
