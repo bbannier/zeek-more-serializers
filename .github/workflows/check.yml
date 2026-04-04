@@ -30,7 +30,7 @@ jobs:
           components: clippy,rustfmt
           target-dirs: build/cargo/build,rust-target
       - uses: actions/setup-python@v6
-      - uses: j178/prek-action@79f765515bd648eb4d6bb1b17277b7cb22cb6468
+      - uses: j178/prek-action@53276d8b0d10f8b6672aa85b4588c6921d0370cc
 
   plugin:
     name: plugin tests
