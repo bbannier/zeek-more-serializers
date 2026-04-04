@@ -5,7 +5,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ctor = "0.6.3"
+ctor = "0.7.0"
 cxx = { version = "1.0.194", features = ["c++20"] }
 proptest = { version = "1.10.0" }
 zeek-types = { path = "../..", features = ["proptest"] }
