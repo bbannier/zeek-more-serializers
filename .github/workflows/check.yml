@@ -20,7 +20,7 @@ jobs:
     name: pre-commit hooks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           submodules: recursive
           persist-credentials: false
@@ -46,7 +46,7 @@ jobs:
       image: ${{ matrix.zeek-version }}
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           persist-credentials: false
       - name: Install dependencies
@@ -86,7 +86,7 @@ jobs:
       image: ${{ matrix.zeek-version }}
 
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v6.0.3
         with:
           persist-credentials: false
       - name: Install dependencies
