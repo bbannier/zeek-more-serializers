@@ -1475,7 +1475,6 @@ dependencies = [
 name = "zeek-more-serializers"
 version = "0.1.0"
 dependencies = [
- "cargo-emit",
  "cxx",
  "postcard",
  "serde",

@@ -40,6 +40,3 @@ unwrap_used = "deny"
 ignored_unit_patterns = "deny"
 clone_on_ref_ptr = "deny"
 redundant_clone = "deny"
-
-[build-dependencies]
-cargo-emit = "0.2.1"
