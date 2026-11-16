@@ -60,7 +60,7 @@ pub mod zeek {
 pub mod support {
     pub use crate::ByteBufferWriter;
     pub use crate::ffi::{
-        ByteBuffer, PluginWrapper, TableEntry, TableIterator, TypePtrVector, TypedZVal,
+        ByteBuffer, PluginWrapper, TableEntry, TableIterator, TypePtr, TypePtrVector, TypedZVal,
         ValPtrVector, analyzer_confirm, analyzer_conn_val, analyzer_enqueue_conn_event,
         event_add_metadata, event_handler_exists, event_make, event_name,
         event_registry_lookup_event_arg_type, event_registry_lookup_metadata, make_addr, make_bool,
