@@ -387,4 +387,34 @@ const zeek::TypePtr &zeek_id_find_type(rust::Str name_) {
   return zeek::id::find_type(name);
 }
 
+bool event_handler_exists(rust::Str name_) {
+  auto name = std::string_view{name_.data(), name_.size()};
+  auto *handler = zeek::event_registry->Lookup(name);
+  return handler && static_cast<bool>(*handler);
+}
+
+void analyzer_enqueue_conn_event(zeek::analyzer::Analyzer &analyzer,
+                                 rust::Str event_name_,
+                                 std::unique_ptr<ValPtrVector> args_) {
+  auto name = std::string_view{event_name_.data(), event_name_.size()};
+  auto *handler = event_lookup_cached(name);
+  if (!handler)
+    return;
+
+  zeek::Args args;
+  if (args_)
+    args = std::move(*args_).data();
+
+  analyzer.EnqueueConnEvent(handler, std::move(args));
+}
+
+std::unique_ptr<zeek::ValPtr>
+analyzer_conn_val(zeek::analyzer::Analyzer &analyzer) {
+  return wrap(analyzer.ConnVal());
+}
+
+void analyzer_confirm(zeek::analyzer::Analyzer &analyzer) {
+  analyzer.AnalyzerConfirmation();
+}
+
 } // namespace support

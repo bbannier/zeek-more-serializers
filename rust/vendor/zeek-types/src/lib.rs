@@ -39,6 +39,10 @@ pub mod zeek {
         VectorVal, ZVal, base_type,
     };
 
+    pub mod analyzer {
+        pub use crate::ffi::Analyzer;
+    }
+
     pub mod cluster {
         pub use crate::ffi::Event;
     }
@@ -57,10 +61,34 @@ pub mod support {
     pub use crate::ByteBufferWriter;
     pub use crate::ffi::{
         ByteBuffer, PluginWrapper, TableEntry, TableIterator, TypePtrVector, TypedZVal,
-        ValPtrVector, event_add_metadata, event_make, event_name,
-        event_registry_lookup_event_arg_type, event_registry_lookup_metadata, val_manager_port,
-        zeek_id_find_type,
+        ValPtrVector, analyzer_confirm, analyzer_conn_val, analyzer_enqueue_conn_event,
+        event_add_metadata, event_handler_exists, event_make, event_name,
+        event_registry_lookup_event_arg_type, event_registry_lookup_metadata, make_addr, make_bool,
+        make_count, make_double, make_enum, make_int, make_interval, make_list, make_null,
+        make_pattern, make_port, make_record, make_set, make_string, make_subnet, make_table,
+        make_time, make_vector, val_manager_port, zeek_id_find_type,
     };
+}
+
+pub struct AnalyzerHandle<'a>(Pin<&'a mut ffi::Analyzer>);
+
+impl<'a> AnalyzerHandle<'a> {
+    #[must_use]
+    pub fn new(analyzer: Pin<&'a mut ffi::Analyzer>) -> Self {
+        Self(analyzer)
+    }
+
+    pub fn enqueue_conn_event(&mut self, event_name: &str, args: UniquePtr<ffi::ValPtrVector>) {
+        ffi::analyzer_enqueue_conn_event(self.0.as_mut(), event_name, args);
+    }
+
+    pub fn conn_val(&mut self) -> UniquePtr<ffi::ValPtr> {
+        ffi::analyzer_conn_val(self.0.as_mut())
+    }
+
+    pub fn confirm(&mut self) {
+        ffi::analyzer_confirm(self.0.as_mut());
+    }
 }
 
 #[allow(
@@ -251,6 +279,12 @@ mod ffi {
         fn base_type(tag: TypeTag) -> &'static TypePtr;
     }
 
+    #[namespace = "::zeek::analyzer"]
+    unsafe extern "C++" {
+        include!("zeek/analyzer/Analyzer.h");
+        type Analyzer;
+    }
+
     #[namespace = "::zeek::cluster"]
     unsafe extern "C++" {
         include!("zeek/cluster/Event.h");
@@ -434,6 +468,23 @@ mod ffi {
 
         #[must_use]
         fn zeek_id_find_type(name: &str) -> &'static TypePtr;
+
+        #[must_use]
+        fn zeek_id_find_val(name: &str) -> UniquePtr<ValPtr>;
+
+        #[must_use]
+        fn event_handler_exists(name: &str) -> bool;
+
+        fn analyzer_enqueue_conn_event(
+            analyzer: Pin<&mut Analyzer>,
+            event_name: &str,
+            args: UniquePtr<ValPtrVector>,
+        );
+
+        #[must_use]
+        fn analyzer_conn_val(analyzer: Pin<&mut Analyzer>) -> UniquePtr<ValPtr>;
+
+        fn analyzer_confirm(analyzer: Pin<&mut Analyzer>);
     }
 }
 

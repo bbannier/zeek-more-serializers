@@ -13,6 +13,7 @@
 #include "zeek/Type.h"
 #include "zeek/Val.h"
 #include "zeek/ZVal.h"
+#include "zeek/analyzer/Analyzer.h"
 #include "zeek/cluster/Event.h"
 
 #include "rust/cxx.h"
@@ -175,5 +176,13 @@ zeek::TypePtr const *event_registry_lookup_event_arg_type(rust::Str name,
 const zeek::PortVal *val_manager_port(uint32_t port_num);
 
 const zeek::TypePtr &zeek_id_find_type(rust::Str name);
+
+bool event_handler_exists(rust::Str name);
+void analyzer_enqueue_conn_event(zeek::analyzer::Analyzer &analyzer,
+                                 rust::Str event_name,
+                                 std::unique_ptr<ValPtrVector> args);
+std::unique_ptr<zeek::ValPtr>
+analyzer_conn_val(zeek::analyzer::Analyzer &analyzer);
+void analyzer_confirm(zeek::analyzer::Analyzer &analyzer);
 
 } // namespace support
