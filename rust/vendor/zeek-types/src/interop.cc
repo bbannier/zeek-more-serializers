@@ -417,4 +417,15 @@ void analyzer_confirm(zeek::analyzer::Analyzer &analyzer) {
   analyzer.AnalyzerConfirmation();
 }
 
+void analyzer_weird(zeek::analyzer::Analyzer &analyzer, rust::Str name,
+                    rust::Str addl) {
+  analyzer.Weird(std::string(name).c_str(), std::string(addl).c_str());
+}
+
+void analyzer_limit_reached_weird(zeek::analyzer::Analyzer &analyzer,
+                                  rust::Str name, size_t limit,
+                                  size_t limit_max) {
+  analyzer.LimitReachedWeird(std::string(name).c_str(), limit, limit_max);
+}
+
 } // namespace support

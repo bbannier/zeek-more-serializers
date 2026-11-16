@@ -184,5 +184,10 @@ void analyzer_enqueue_conn_event(zeek::analyzer::Analyzer &analyzer,
 std::unique_ptr<zeek::ValPtr>
 analyzer_conn_val(zeek::analyzer::Analyzer &analyzer);
 void analyzer_confirm(zeek::analyzer::Analyzer &analyzer);
+void analyzer_weird(zeek::analyzer::Analyzer &analyzer, rust::Str name,
+                    rust::Str addl);
+void analyzer_limit_reached_weird(zeek::analyzer::Analyzer &analyzer,
+                                  rust::Str name, size_t limit,
+                                  size_t limit_max);
 
 } // namespace support

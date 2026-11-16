@@ -89,6 +89,14 @@ impl<'a> AnalyzerHandle<'a> {
     pub fn confirm(&mut self) {
         ffi::analyzer_confirm(self.0.as_mut());
     }
+
+    pub fn weird(&mut self, name: &str, addl: &str) {
+        ffi::analyzer_weird(self.0.as_mut(), name, addl);
+    }
+
+    pub fn limit_reached_weird(&mut self, name: &str, limit: usize, limit_max: usize) {
+        ffi::analyzer_limit_reached_weird(self.0.as_mut(), name, limit, limit_max);
+    }
 }
 
 #[allow(
@@ -485,6 +493,13 @@ mod ffi {
         fn analyzer_conn_val(analyzer: Pin<&mut Analyzer>) -> UniquePtr<ValPtr>;
 
         fn analyzer_confirm(analyzer: Pin<&mut Analyzer>);
+        fn analyzer_weird(analyzer: Pin<&mut Analyzer>, name: &str, addl: &str);
+        fn analyzer_limit_reached_weird(
+            analyzer: Pin<&mut Analyzer>,
+            name: &str,
+            limit: usize,
+            limit_max: usize,
+        );
     }
 }
 
