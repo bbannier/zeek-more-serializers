@@ -27,6 +27,7 @@ pub trait ValInterface {
     fn as_addr_val(&self) -> Option<&ffi::AddrVal>;
     fn as_subnet_val(&self) -> Option<&ffi::SubNetVal>;
     fn as_vector_val(&self) -> Option<&ffi::VectorVal>;
+    #[allow(clippy::missing_errors_doc)]
     fn as_enum(&self) -> Result<u64>;
     fn as_pattern_val(&self) -> Option<&ffi::PatternVal>;
     fn as_table_val(&self) -> Option<&ffi::TableVal>;
