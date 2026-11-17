@@ -27,6 +27,7 @@ pub trait ValInterface {
     fn as_addr_val(&self) -> Option<&ffi::AddrVal>;
     fn as_subnet_val(&self) -> Option<&ffi::SubNetVal>;
     fn as_vector_val(&self) -> Option<&ffi::VectorVal>;
+    #[allow(clippy::missing_errors_doc)]
     fn as_enum(&self) -> Result<u64>;
     fn as_pattern_val(&self) -> Option<&ffi::PatternVal>;
     fn as_table_val(&self) -> Option<&ffi::TableVal>;
@@ -394,7 +395,10 @@ impl Val<'_> {
             Val::Vec(xs) => {
                 check_dest_type!(TypeTag::TYPE_VECTOR);
 
-                let yield_ = zeek::base_type(zeek::TypeTag::TYPE_ANY);
+                let yield_ = ty.and_then(|t| t.as_vector_type()).map_or_else(
+                    || zeek::base_type(zeek::TypeTag::TYPE_ANY),
+                    super::ffi::VectorType::Yield,
+                );
 
                 let mut vals = ffi::ValPtrVector::make(xs.len());
 

@@ -1190,7 +1190,6 @@ dependencies = [
  "ctor",
  "cxx",
  "proptest",
- "scratch",
  "zeek-types",
 ]
 

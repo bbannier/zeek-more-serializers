@@ -12,7 +12,6 @@ zeek-types = { path = "../..", features = ["proptest"] }
 
 [build-dependencies]
 cargo-emit = "0.2.1"
-scratch = "1.0.9"
 
 [lib]
 crate-type = ["dylib"]
