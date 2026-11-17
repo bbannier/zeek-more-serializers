@@ -8,6 +8,8 @@ pub mod types;
 mod val;
 mod zval;
 
+pub use val::ValInterface;
+
 #[cfg(feature = "proptest")]
 pub use val::arbitrary_val;
 
@@ -53,6 +55,7 @@ pub mod zeek {
 
     pub mod id {
         pub use crate::ffi::zeek_id_find_type as find_type;
+        pub use crate::ffi::zeek_id_find_val as find_val;
     }
 }
 
@@ -96,6 +99,10 @@ impl<'a> AnalyzerHandle<'a> {
 
     pub fn limit_reached_weird(&mut self, name: &str, limit: usize, limit_max: usize) {
         ffi::analyzer_limit_reached_weird(self.0.as_mut(), name, limit, limit_max);
+    }
+
+    pub fn violation(&mut self, reason: &str) {
+        ffi::analyzer_violation(self.0.as_mut(), reason);
     }
 }
 
@@ -500,6 +507,7 @@ mod ffi {
             limit: usize,
             limit_max: usize,
         );
+        fn analyzer_violation(analyzer: Pin<&mut Analyzer>, reason: &str);
     }
 }
 

@@ -417,6 +417,11 @@ void analyzer_confirm(zeek::analyzer::Analyzer &analyzer) {
   analyzer.AnalyzerConfirmation();
 }
 
+std::unique_ptr<zeek::ValPtr> zeek_id_find_val(rust::Str name) {
+  auto val = zeek::id::find_val(std::string_view(name.data(), name.size()));
+  return wrap(val);
+}
+
 void analyzer_weird(zeek::analyzer::Analyzer &analyzer, rust::Str name,
                     rust::Str addl) {
   analyzer.Weird(std::string(name).c_str(), std::string(addl).c_str());
@@ -426,6 +431,10 @@ void analyzer_limit_reached_weird(zeek::analyzer::Analyzer &analyzer,
                                   rust::Str name, size_t limit,
                                   size_t limit_max) {
   analyzer.LimitReachedWeird(std::string(name).c_str(), limit, limit_max);
+}
+
+void analyzer_violation(zeek::analyzer::Analyzer &analyzer, rust::Str reason) {
+  analyzer.AnalyzerViolation(std::string(reason).c_str());
 }
 
 } // namespace support
