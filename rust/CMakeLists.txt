@@ -17,6 +17,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 corrosion_import_crate(
     MANIFEST_PATH Cargo.toml
     CRATES zeek-more-serializers
+    LOCKED
     FEATURES corrosion
 )
 corrosion_add_cxxbridge(

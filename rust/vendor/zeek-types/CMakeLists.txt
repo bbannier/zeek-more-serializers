@@ -13,6 +13,7 @@ FetchContent_MakeAvailable(Corrosion)
 corrosion_import_crate(
     MANIFEST_PATH Cargo.toml
     CRATES zeek-types
+    LOCKED
     FEATURES corrosion
 )
 corrosion_add_cxxbridge(
