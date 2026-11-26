@@ -2,7 +2,7 @@ exclude: testing/Baseline/|bench.ipynb
 
 repos:
 - repo: https://github.com/pre-commit/mirrors-clang-format
-  rev: cd481d7b0bfb5c7b3090c21846317f9a8262e891  # frozen: v22.1.0
+  rev: ce4bd7270237e95464b37d808b942f02785192c4  # frozen: v23.1.5
   hooks:
   - id: clang-format
     types_or: ["c", "c++"]
@@ -16,13 +16,13 @@ repos:
   - id: check-added-large-files
 
 - repo: https://github.com/crate-ci/typos
-  rev: 631208b7aac2daa8b707f55e7331f9112b0e062d  # frozen: v1.44.0
+  rev: 276087d9a4f06398b3e04825487805e2d7375888  # frozen: v1.52.2
   hooks:
   - id: typos
     exclude: plugin/src/Plugin.cc
 
 - repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: a27a2e47c7751b639d2b5badf0ef6ff11fee893f  # frozen: v0.15.4
+  rev: 9026c9127e153371d7a78dfcb0c45ae2046a3d10  # frozen: v0.17.6
   hooks:
     - id: ruff-check
       args: ["--fix"]

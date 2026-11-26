@@ -110,11 +110,11 @@ def gen(format: str) -> None:
 
 # @TEST-END-FILE
 
-from generator import gen  # noqa: F811, E402
+from generator import gen  # noqa: F811
 
 gen("FormatBinary")
 
 # @TEST-START-NEXT
-from generator import gen  # noqa: F811, E402
+from generator import gen
 
 gen("FormatHuman")
