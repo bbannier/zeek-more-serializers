@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -9,7 +11,7 @@ mod tests {
     #[test]
     fn plugin_tests() {
         // FIXME(bbannier): instead of manually loads they should be generated automatically.
-        let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let loads = manifest_dir
             .parent()
             .unwrap()

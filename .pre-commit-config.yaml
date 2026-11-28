@@ -33,6 +33,6 @@ repos:
   hooks:
     - id: fmt
     - id: clippy
-      args: ['--all', '--all-features', '--workspace']
+      args: ['--all', '--all-features', '--all-targets', '--workspace']
     - id: cargo-check
-      args: ['--all', '--all-features', '--workspace']
+      args: ['--all', '--all-features', '--all-targets', '--workspace']
