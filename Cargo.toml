@@ -1,0 +1,23 @@
+[workspace]
+members = [
+    "rust",
+    "rust/vendor/zeek-types",
+    "rust/vendor/zeek-types/tests/test-plugin",
+    "rust/vendor/zeek-types/tests/runner",
+    "rust/vendor/zeek-types/tests/xtask",
+]
+resolver = "3"
+
+[workspace.lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+ignored_unit_patterns = "deny"
+clone_on_ref_ptr = "deny"
+redundant_clone = "deny"
+
+[profile.release]
+panic = "abort"
+strip = true
+codegen-units = 1
+lto = true
+opt-level = "z"

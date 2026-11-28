@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use std::{pin::Pin, str::FromStr, sync::LazyLock};
 
 use ctor::ctor;
@@ -17,8 +19,8 @@ use zeek_types::{
 // Zeek expects plugins to be constructed on library load time. This function accomplishes that.
 #[ctor(unsafe)]
 fn init() {
-    static _PLUGIN: LazyLock<TestPlugin> = LazyLock::new(TestPlugin::new);
-    let _ = &*_PLUGIN;
+    static PLUGIN: LazyLock<TestPlugin> = LazyLock::new(TestPlugin::new);
+    let _ = &*PLUGIN;
 }
 
 struct TestPlugin(#[allow(unused)] UniquePtr<PluginWrapper>);
@@ -110,7 +112,7 @@ fn check_round_trip() {
             }
             Ok(())
         })
-        .unwrap();
+        .expect("failed to run tests");
 
     println!("{runner}");
 }

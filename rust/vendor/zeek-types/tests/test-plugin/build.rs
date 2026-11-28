@@ -4,7 +4,7 @@ fn main() {
     rerun_if_changed!("build.rs");
 
     // Allow underlinking since symbols from Zeek are only resolved when a plugin is loaded into Zeek.
-    let target = std::env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let target = std::env::var("CARGO_CFG_TARGET_OS").expect("no target OS selected");
     match target.as_str() {
         "macos" => {
             rustc_link_arg!("-Wl,-undefined,dynamic_lookup");

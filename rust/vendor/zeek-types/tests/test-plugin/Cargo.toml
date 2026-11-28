@@ -17,3 +17,6 @@ cargo-emit = "0.2.1"
 crate-type = ["dylib"]
 test = false
 doctest = false
+
+[lints]
+workspace = true

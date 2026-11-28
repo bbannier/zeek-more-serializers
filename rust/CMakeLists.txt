@@ -15,7 +15,7 @@ FetchContent_MakeAvailable(Corrosion)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 corrosion_import_crate(
-    MANIFEST_PATH Cargo.toml
+    MANIFEST_PATH ${CMAKE_SOURCE_DIR}/Cargo.toml
     CRATES zeek-more-serializers
     LOCKED
     FEATURES corrosion

@@ -3,14 +3,6 @@ name = "zeek-more-serializers"
 version = "0.1.0"
 edition = "2024"
 
-[workspace]
-members = [
-    "vendor/zeek-types",
-    "vendor/zeek-types/tests/test-plugin",
-    "vendor/zeek-types/tests/runner",
-    "vendor/zeek-types/tests/xtask",
-]
-
 [lib]
 crate-type = ["staticlib"]
 test = false
@@ -27,16 +19,5 @@ zeek-types = { path = "vendor/zeek-types", features = ["serde"] }
 [features]
 corrosion = ["zeek-types/corrosion"]
 
-[profile.release]
-panic = "abort"
-strip = true
-codegen-units = 1
-lto = true
-opt-level = "z"
-
-[lints.clippy]
-pedantic = { level = "deny", priority = -1 }
-unwrap_used = "deny"
-ignored_unit_patterns = "deny"
-clone_on_ref_ptr = "deny"
-redundant_clone = "deny"
+[lints]
+workspace = true

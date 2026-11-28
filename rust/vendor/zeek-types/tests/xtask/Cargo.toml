@@ -7,3 +7,6 @@ edition = "2024"
 anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive", "help", "std"], default-features = false }
 scratch = "1.0.9"
+
+[lints]
+workspace = true

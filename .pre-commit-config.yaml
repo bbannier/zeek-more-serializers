@@ -27,3 +27,12 @@ repos:
     - id: ruff-check
       args: ["--fix"]
     - id: ruff-format
+
+- repo: https://github.com/doublify/pre-commit-rust
+  rev: eeee35a89e69d5772bdee97db1a6a898467b686e  # frozen: v1.0
+  hooks:
+    - id: fmt
+    - id: clippy
+      args: ['--all', '--all-features', '--workspace']
+    - id: cargo-check
+      args: ['--all', '--all-features', '--workspace']

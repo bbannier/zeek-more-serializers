@@ -34,7 +34,7 @@ fn main() -> Result<()> {
     let args = Args::parse();
     match args.command {
         Command::DistDir => dist_dir(),
-        Command::Dist { plugin, defs } => dist(plugin, defs),
+        Command::Dist { plugin, defs } => dist(&plugin, defs),
     }
 }
 
@@ -42,16 +42,16 @@ fn dist_dir() -> Result<()> {
     let dist = scratch::path("dist");
     let dist = dist
         .to_str()
-        .ok_or(anyhow!("path '{dist:?}' is not valid UTF-8"))?;
+        .ok_or(anyhow!("path '{}' is not valid UTF-8", dist.display()))?;
     println!("{dist}");
 
     Ok(())
 }
 
-fn dist(package: String, defs: Vec<PathBuf>) -> Result<()> {
+fn dist(package: &str, defs: Vec<PathBuf>) -> Result<()> {
     // Build the package.
     std::process::Command::new("cargo")
-        .args(["build", "--package", &package])
+        .args(["build", "--package", package])
         .status()?;
 
     let out_dir: PathBuf = env!("OUT_DIR").into();
@@ -67,16 +67,16 @@ fn dist(package: String, defs: Vec<PathBuf>) -> Result<()> {
     let lib_dir = dist.join("lib");
     let _ = fs::remove_dir_all(&lib_dir);
     fs::create_dir(&lib_dir)?;
-    let mut dir = out_dir.clone();
+    let mut dir = out_dir;
     while !dir.ends_with("build") {
         dir.pop();
     }
     dir.pop();
-    let lib_name = package.replace("-", "_");
+    let name = package.replace('-', "_");
     let dylib = if cfg!(target_os = "macos") {
-        format!("lib{}.dylib", lib_name)
+        format!("lib{name}.dylib")
     } else {
-        format!("lib{}.so", lib_name)
+        format!("lib{name}.so")
     };
     let dylib = dir.join(dylib);
     let os = env::var("CARGO_CFG_TARGET_OS")?;
@@ -101,7 +101,7 @@ fn dist(package: String, defs: Vec<PathBuf>) -> Result<()> {
             panic!("unsupported target architecture '{arch}'");
         }
     };
-    let new_name = lib_dir.join(format!("lib{lib_name}.{os}-{arch}.so"));
+    let new_name = lib_dir.join(format!("lib{name}.{os}-{arch}.so"));
 
     os::unix::fs::symlink(dylib, &new_name)?;
 
