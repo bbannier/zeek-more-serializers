@@ -1,10 +1,10 @@
 [workspace]
 members = [
     "rust",
-    "rust/vendor/zeek-types",
-    "rust/vendor/zeek-types/tests/test-plugin",
-    "rust/vendor/zeek-types/tests/runner",
-    "rust/vendor/zeek-types/tests/xtask",
+    "rust/vendor/zeek-ffi",
+    "rust/vendor/zeek-ffi/tests/test-plugin",
+    "rust/vendor/zeek-ffi/tests/runner",
+    "rust/vendor/zeek-ffi/tests/xtask",
 ]
 resolver = "3"
 

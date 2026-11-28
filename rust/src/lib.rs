@@ -2,7 +2,7 @@ use std::{fmt::Debug, pin::Pin};
 
 use cxx::UniquePtr;
 use thiserror::Error;
-use zeek_types::{ByteBufferWriter, support::ByteBuffer, zeek};
+use zeek_ffi::{ByteBufferWriter, support::ByteBuffer, zeek};
 
 use crate::{
     ffi::Format,
@@ -31,21 +31,21 @@ mod ffi {
 
     #[namespace = "::zeek"]
     unsafe extern "C++" {
-        type EnumValPtr = zeek_types::zeek::EnumValPtr;
-        type TypePtr = zeek_types::zeek::TypePtr;
-        type Val = zeek_types::zeek::Val;
-        type ValPtr = zeek_types::zeek::ValPtr;
+        type EnumValPtr = zeek_ffi::zeek::EnumValPtr;
+        type TypePtr = zeek_ffi::zeek::TypePtr;
+        type Val = zeek_ffi::zeek::Val;
+        type ValPtr = zeek_ffi::zeek::ValPtr;
 
         #[namespace = "::zeek::cluster"]
-        type Event = zeek_types::zeek::cluster::Event;
+        type Event = zeek_ffi::zeek::cluster::Event;
     }
 
     #[namespace = "::support"]
     unsafe extern "C++" {
-        include!("zeek-types/src/interop.h");
+        include!("zeek-ffi/src/interop.h");
 
-        type ByteBuffer = zeek_types::support::ByteBuffer;
-        type ValPtrVector = zeek_types::support::ValPtrVector;
+        type ByteBuffer = zeek_ffi::support::ByteBuffer;
+        type ValPtrVector = zeek_ffi::support::ValPtrVector;
     }
 }
 
@@ -82,7 +82,7 @@ fn deserialize_event(buf: &[u8], format: Format) -> Result<UniquePtr<zeek::clust
 #[derive(Error, Debug)]
 enum Error {
     #[error(transparent)]
-    Conversion(#[from] zeek_types::Error),
+    Conversion(#[from] zeek_ffi::Error),
 
     #[error(transparent)]
     Postcard(#[from] postcard::Error),

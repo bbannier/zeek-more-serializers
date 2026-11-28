@@ -1,4 +1,4 @@
-Tests for `zeek-types`
+Tests for `zeek-ffi`
 ======================
 
 Usually Zeek does not ship with a library, but instead all plugins are assumed

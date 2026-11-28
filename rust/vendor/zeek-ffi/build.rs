@@ -4,7 +4,7 @@ use std::process::Command;
 fn main() -> Result<(), String> {
     // Force prefix to be compatible with corrosion-style build.
     use cxx_build::CFG;
-    CFG.include_prefix = "zeek_types_cxx";
+    CFG.include_prefix = "zeek_ffi_cxx";
 
     let mut bridge = cxx_build::bridge("src/lib.rs");
     // Skip building bridge if we are building with corrosion in which case the bridge will be
@@ -19,7 +19,7 @@ fn main() -> Result<(), String> {
             .flag_if_supported("-Wno-unused-variable")
             .std("c++20")
             .debug(zeek_debug_build()?)
-            .compile("zeek-types");
+            .compile("zeek-ffi");
 
         rerun_if_changed!("build.rs");
         rerun_if_changed!("src/lib.rs");

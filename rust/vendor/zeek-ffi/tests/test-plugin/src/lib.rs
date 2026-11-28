@@ -8,7 +8,7 @@ use proptest::{
     prelude::*,
     test_runner::{Config, TestRunner},
 };
-use zeek_types::{
+use zeek_ffi::{
     Error, IpNetwork, Subnet, Val, arbitrary_val,
     support::PluginWrapper,
     types::{SetType, Type},

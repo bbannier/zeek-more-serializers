@@ -1,7 +1,7 @@
 use std::io::{BufWriter, Write};
 
 use postcard::ser_flavors::{self};
-use zeek_types::zeek;
+use zeek_ffi::zeek;
 
 use crate::{Error, Result, ffi::Format};
 
@@ -121,7 +121,7 @@ where
 //////////////////////////////////////////
 
 impl<'a> ToSchema<'a, Binary> for zeek::Val {
-    type Schema = zeek_types::Val<'a>;
+    type Schema = zeek_ffi::Val<'a>;
     fn to_schema(&'a self) -> Result<Self::Schema> {
         let schema = self.try_into()?;
         Ok(schema)
@@ -129,7 +129,7 @@ impl<'a> ToSchema<'a, Binary> for zeek::Val {
 }
 
 impl<'a> ToSchema<'a, Binary> for zeek::cluster::Event {
-    type Schema = zeek_types::Event<'a>;
+    type Schema = zeek_ffi::Event<'a>;
     fn to_schema(&'a self) -> Result<Self::Schema> {
         let schema = self.try_into()?;
         Ok(schema)
@@ -137,21 +137,21 @@ impl<'a> ToSchema<'a, Binary> for zeek::cluster::Event {
 }
 
 impl<'a> ToSchema<'a, Human> for zeek::Val {
-    type Schema = zeek_types::Val<'a>;
+    type Schema = zeek_ffi::Val<'a>;
     fn to_schema(&'a self) -> Result<Self::Schema> {
         ToSchema::<Binary>::to_schema(self)
     }
 }
 
 impl<'a> ToSchema<'a, Human> for zeek::cluster::Event {
-    type Schema = zeek_types::Event<'a>;
+    type Schema = zeek_ffi::Event<'a>;
     fn to_schema(&'a self) -> Result<Self::Schema> {
         ToSchema::<Binary>::to_schema(self)
     }
 }
 
 impl<'de> FromSchema<'de, Binary> for cxx::UniquePtr<zeek::ValPtr> {
-    type Schema = zeek_types::Val<'de>;
+    type Schema = zeek_ffi::Val<'de>;
     fn from_schema(schema: Self::Schema, typ: Option<&zeek::TypePtr>) -> Result<Self> {
         let val = schema.to_valptr(typ)?;
         Ok(val)
@@ -159,7 +159,7 @@ impl<'de> FromSchema<'de, Binary> for cxx::UniquePtr<zeek::ValPtr> {
 }
 
 impl<'de> FromSchema<'de, Binary> for cxx::UniquePtr<zeek::cluster::Event> {
-    type Schema = zeek_types::Event<'de>;
+    type Schema = zeek_ffi::Event<'de>;
     fn from_schema(schema: Self::Schema, _typ: Option<&zeek::TypePtr>) -> Result<Self>
     where
         Self: Sized,
@@ -171,7 +171,7 @@ impl<'de> FromSchema<'de, Binary> for cxx::UniquePtr<zeek::cluster::Event> {
 }
 
 impl<'de> FromSchema<'de, Human> for cxx::UniquePtr<zeek::ValPtr> {
-    type Schema = zeek_types::Val<'de>;
+    type Schema = zeek_ffi::Val<'de>;
     fn from_schema(schema: Self::Schema, typ: Option<&zeek::TypePtr>) -> Result<Self>
     where
         Self: Sized,
@@ -182,7 +182,7 @@ impl<'de> FromSchema<'de, Human> for cxx::UniquePtr<zeek::ValPtr> {
 }
 
 impl<'de> FromSchema<'de, Human> for cxx::UniquePtr<zeek::cluster::Event> {
-    type Schema = zeek_types::Event<'de>;
+    type Schema = zeek_ffi::Event<'de>;
     fn from_schema(schema: Self::Schema, typ: Option<&zeek::TypePtr>) -> Result<Self>
     where
         Self: Sized,

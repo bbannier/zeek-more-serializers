@@ -22,9 +22,9 @@
 #include "zeek/script_opt/CPP/RuntimeOps.h"
 
 #ifdef CORROSION_BUILD
-#include "zeek_types_cxx/lib.h"
+#include "zeek_ffi_cxx/lib.h"
 #else
-#include "zeek_types_cxx/src/lib.rs.h"
+#include "zeek_ffi_cxx/src/lib.rs.h"
 #endif
 
 namespace support {

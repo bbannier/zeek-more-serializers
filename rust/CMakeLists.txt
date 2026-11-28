@@ -36,6 +36,6 @@ set_target_properties(zeek_more_serializers_cxx PROPERTIES
     CXX_EXTENSIONS OFF
 )
 
-# Our cxx code depends on headers from `zeek-types`, express that dependency.
-add_subdirectory(vendor/zeek-types)
-target_link_libraries(zeek_more_serializers_cxx PUBLIC zeek_types_cxx)
+# Our cxx code depends on headers from `zeek-ffi`, express that dependency.
+add_subdirectory(vendor/zeek-ffi)
+target_link_libraries(zeek_more_serializers_cxx PUBLIC zeek_ffi_cxx)
